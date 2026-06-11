@@ -55,6 +55,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                const Icon(Icons.account_circle_outlined),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    appState.authEmail,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: appState.isBusy ? null : appState.logout,
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Salir'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
             child: Column(
               children: [
                 TextField(

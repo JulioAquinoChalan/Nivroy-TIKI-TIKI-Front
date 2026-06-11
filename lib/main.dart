@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'core/app_state.dart';
+import 'features/auth/login_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
 import 'features/events/events_screen.dart';
 import 'features/rules/rules_screen.dart';
@@ -43,8 +44,27 @@ class NivroyApp extends StatelessWidget {
           indicatorColor: colorScheme.primaryContainer,
         ),
       ),
-      home: const AppShell(),
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final appState = context.watch<AppState>();
+
+    if (!appState.isInitialized) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (!appState.isAuthenticated || !appState.isEmailVerified) {
+      return const LoginScreen();
+    }
+
+    return const AppShell();
   }
 }
 

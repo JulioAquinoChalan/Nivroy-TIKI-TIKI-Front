@@ -36,6 +36,7 @@ class AppState extends ChangeNotifier {
     'SERVERTAP_URL',
     defaultValue: 'http://127.0.0.1:4567',
   );
+  static const _defaultServerTapUrl = 'http://127.0.0.1:4567';
   static const _environmentServerTapKey = String.fromEnvironment(
     'SERVERTAP_KEY',
   );
@@ -51,7 +52,7 @@ class AppState extends ChangeNotifier {
 
   String backendUrl = _env('BACKEND_URL', _environmentBackendUrl);
   String tiktokUsername = _env('TIKTOK_USERNAME', _environmentTikTokUsername);
-  String serverTapUrl = _env('SERVERTAP_URL', _environmentServerTapUrl);
+  String serverTapUrl = _initialServerTapUrl();
   String serverTapKey = _env('SERVERTAP_KEY', _environmentServerTapKey);
   String exarotonToken = _env('EXAROTON_API_TOKEN', _environmentExarotonToken);
   String exarotonServerId = _env(
@@ -92,6 +93,19 @@ class AppState extends ChangeNotifier {
     return value == null || value.isEmpty ? fallback : value;
   }
 
+  static String _initialServerTapUrl() {
+    final url = _env('SERVERTAP_URL', _environmentServerTapUrl);
+    return _isBlockedDefaultServerTapUrl(url) ? '' : url;
+  }
+
+  static bool _isBlockedDefaultServerTapUrl(String url) {
+    if (!kIsWeb || url != _defaultServerTapUrl) {
+      return false;
+    }
+
+    return Uri.base.scheme == 'https';
+  }
+
   ApiService get _api => ApiService(backendUrl, idToken: _idToken);
   ServerTapService get _serverTap =>
       ServerTapService(baseUrl: serverTapUrl, key: serverTapKey);
@@ -129,6 +143,9 @@ class AppState extends ChangeNotifier {
     backendUrl = prefs.getString(_backendUrlKey) ?? backendUrl;
     tiktokUsername = prefs.getString(_tiktokUsernameKey) ?? tiktokUsername;
     serverTapUrl = prefs.getString(_serverTapUrlKey) ?? serverTapUrl;
+    if (_isBlockedDefaultServerTapUrl(serverTapUrl)) {
+      serverTapUrl = '';
+    }
     serverTapKey = prefs.getString(_serverTapKeyKey) ?? serverTapKey;
     exarotonToken = prefs.getString(_exarotonTokenKey) ?? exarotonToken;
     exarotonServerId =
@@ -197,7 +214,6 @@ class AppState extends ChangeNotifier {
     await prefs.setString(_serverTapKeyKey, serverTapKey);
 
     connectWebSocket();
-    await connectServerTap();
     await refresh();
   }
 
@@ -808,7 +824,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _setError(Object error) {
-    lastError = error.toString();
+    lastError = _formatError(error);
     _errorTimer?.cancel();
     _errorTimer = Timer(const Duration(seconds: 3), () {
       lastError = null;
@@ -820,6 +836,13 @@ class AppState extends ChangeNotifier {
     _errorTimer?.cancel();
     _errorTimer = null;
     lastError = null;
+  }
+
+  String _formatError(Object error) {
+    return error
+        .toString()
+        .replaceFirst(RegExp(r'^(Exception|Bad state):\s*'), '')
+        .replaceFirst(RegExp(r'^TimeoutException after .+?:\s*'), '');
   }
 
   @override

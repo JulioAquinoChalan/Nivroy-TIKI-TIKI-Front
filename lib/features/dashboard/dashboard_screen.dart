@@ -368,7 +368,6 @@ class _LocalConnectionCard extends StatelessWidget {
               width: 300,
               child: TextField(
                 controller: serverTapUrlController,
-                enabled: !appState.isBusy,
                 textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'URL ServerTap local',
@@ -386,7 +385,6 @@ class _LocalConnectionCard extends StatelessWidget {
               width: 240,
               child: TextField(
                 controller: serverTapKeyController,
-                enabled: !appState.isBusy,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
                 decoration: const InputDecoration(

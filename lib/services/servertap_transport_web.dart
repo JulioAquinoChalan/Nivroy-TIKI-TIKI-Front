@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
+
+const _serverTapRequestTimeout = Duration(seconds: 8);
 
 class ServerTapResponse {
   const ServerTapResponse({required this.statusCode, required this.body});
@@ -15,6 +18,8 @@ Future<ServerTapResponse> serverTapRequest(
   Map<String, String>? headers,
   Map<String, String>? body,
 }) async {
+  _validateWebRequest(uri);
+
   final requestHeaders = web.Headers();
   for (final entry in (headers ?? const <String, String>{}).entries) {
     requestHeaders.set(entry.key, entry.value);
@@ -31,12 +36,27 @@ Future<ServerTapResponse> serverTapRequest(
           targetAddressSpace: _targetAddressSpace(uri),
         ),
       )
-      .toDart;
+      .toDart
+      .timeout(
+        _serverTapRequestTimeout,
+        onTimeout: () => throw TimeoutException(
+          'ServerTap no respondio. Revisa la URL/IP y vuelve a intentar.',
+          _serverTapRequestTimeout,
+        ),
+      );
 
   return ServerTapResponse(
     statusCode: response.status,
     body: (await response.text().toDart).toDart,
   );
+}
+
+void _validateWebRequest(Uri uri) {
+  if (Uri.base.scheme == 'https' && uri.scheme == 'http') {
+    throw StateError(
+      'La web publicada usa HTTPS y no puede conectarse a ServerTap por HTTP. Usa una URL HTTPS o cambia la URL/IP de ServerTap.',
+    );
+  }
 }
 
 String _targetAddressSpace(Uri uri) {

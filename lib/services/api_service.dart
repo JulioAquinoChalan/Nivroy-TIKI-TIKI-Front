@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../models/app_event.dart';
+import '../models/exaroton_server.dart';
 import '../models/health_status.dart';
 import '../models/minecraft_rule.dart';
 
@@ -114,6 +115,8 @@ class ApiService {
     required String trigger,
     required String command,
     required String target,
+    required bool voiceEnabled,
+    required String voiceMessage,
     bool enabled = true,
   }) async {
     final response = await _post('/rules', {
@@ -122,6 +125,8 @@ class ApiService {
       'command': command,
       'target': target,
       'enabled': enabled,
+      'voiceEnabled': voiceEnabled,
+      'voiceMessage': voiceMessage,
     });
 
     return MinecraftRule.fromJson(response['rule'] as Map<String, dynamic>);
@@ -133,6 +138,8 @@ class ApiService {
     required String trigger,
     required String command,
     required String target,
+    required bool voiceEnabled,
+    required String voiceMessage,
     required bool enabled,
   }) async {
     final response = await _put('/rules/$id', {
@@ -141,6 +148,8 @@ class ApiService {
       'command': command,
       'target': target,
       'enabled': enabled,
+      'voiceEnabled': voiceEnabled,
+      'voiceMessage': voiceMessage,
     });
 
     return MinecraftRule.fromJson(response['rule'] as Map<String, dynamic>);
@@ -170,6 +179,50 @@ class ApiService {
 
   Future<void> disconnectTikTok() async {
     await _post('/tiktok/disconnect', {});
+  }
+
+  Future<List<ExarotonServer>> getExarotonServers({
+    required String token,
+  }) async {
+    final response = await http.get(
+      _uri('/minecraft/exaroton/servers'),
+      headers: {
+        ..._authHeaders,
+        if (token.trim().isNotEmpty) 'x-exaroton-token': token.trim(),
+      },
+    );
+    final decoded = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body);
+
+    if (response.statusCode >= 400) {
+      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
+      throw Exception(message ?? 'Backend returned ${response.statusCode}');
+    }
+
+    final data = decoded is Map<String, dynamic>
+        ? decoded['servers'] as List<dynamic>? ?? const []
+        : const [];
+    return data
+        .map((item) => ExarotonServer.fromJson(item as Map<String, dynamic>))
+        .where((server) => server.id.isNotEmpty)
+        .toList();
+  }
+
+  Future<void> sendMinecraftCommand({
+    required String provider,
+    required String command,
+    String? exarotonToken,
+    String? serverId,
+  }) async {
+    await _post('/minecraft/commands', {
+      'provider': provider,
+      'command': command,
+      if (exarotonToken != null && exarotonToken.trim().isNotEmpty)
+        'exarotonToken': exarotonToken.trim(),
+      if (serverId != null && serverId.trim().isNotEmpty)
+        'serverId': serverId.trim(),
+    });
   }
 
   Future<Map<String, dynamic>> _post(

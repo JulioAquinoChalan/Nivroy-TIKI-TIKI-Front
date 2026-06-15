@@ -69,6 +69,11 @@ class RulesScreen extends StatelessWidget {
     var commandAction = _commandActions.first;
     var targetMode = _targetModes.first;
     var position = _positions.first;
+    var showUserNameOnSpawn = rule?.command.contains('CustomName') ?? false;
+    var announceCommand =
+        rule?.command.split('\n').any((line) => line.contains(' run say ')) ??
+        false;
+    var voiceEnabled = rule?.voiceEnabled ?? false;
     var selectedGiftOption = _giftOptionForTrigger(
       rule?.trigger ?? _giftOptions.first.trigger,
     );
@@ -81,6 +86,16 @@ class RulesScreen extends StatelessWidget {
     );
     final targetController = TextEditingController(text: rule?.target ?? '');
     final playerController = TextEditingController();
+    final announcementController = TextEditingController(
+      text:
+          _announcementFromCommand(rule?.command ?? '') ??
+          '{user} envio un ${commandAction.visualName}',
+    );
+    final voiceMessageController = TextEditingController(
+      text: rule?.voiceMessage.isNotEmpty == true
+          ? rule!.voiceMessage
+          : '{user} envio un ${commandAction.visualName}',
+    );
     final commandController = TextEditingController(text: rule?.command ?? '');
 
     void updateGeneratedCommand() {
@@ -101,6 +116,12 @@ class RulesScreen extends StatelessWidget {
               ? Map<_ArmorSlot, _ArmorMaterial?>.from(armorSelections)
               : const {},
           mainHand: commandAction.supportsZombieWeapon ? zombieWeapon : null,
+        ),
+        spawnOptions: _SpawnOptions(
+          customName: showUserNameOnSpawn ? '{user}' : '',
+          announcementCommand: announceCommand
+              ? announcementController.text.trim()
+              : '',
         ),
       );
       targetController.text = commandAction.visualName;
@@ -261,10 +282,84 @@ class RulesScreen extends StatelessWidget {
                           }
                           setDialogState(() {
                             commandAction = value;
+                            announcementController.text =
+                                '{user} envio un ${value.visualName}';
+                            if (!voiceEnabled ||
+                                voiceMessageController.text.trim().isEmpty) {
+                              voiceMessageController.text =
+                                  '{user} envio un ${value.visualName}';
+                            }
                             updateGeneratedCommand();
                           });
                         },
                       ),
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.badge_outlined),
+                        title: const Text('Mostrar usuario en el spawn'),
+                        value: showUserNameOnSpawn,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            showUserNameOnSpawn = value;
+                            updateGeneratedCommand();
+                          });
+                        },
+                      ),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.record_voice_over),
+                        title: const Text('Anunciar comando en chat'),
+                        value: announceCommand,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            announceCommand = value;
+                            updateGeneratedCommand();
+                          });
+                        },
+                      ),
+                      if (announceCommand) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: announcementController,
+                          decoration: const InputDecoration(
+                            labelText: 'Mensaje del anuncio',
+                            hintText: '{user} envio un creeper',
+                            prefixIcon: Icon(Icons.chat_bubble_outline),
+                            border: OutlineInputBorder(),
+                          ),
+                          onChanged: (_) =>
+                              setDialogState(updateGeneratedCommand),
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: const Icon(Icons.volume_up_outlined),
+                        title: const Text('Leer mensaje con voz'),
+                        value: voiceEnabled,
+                        onChanged: (value) {
+                          setDialogState(() {
+                            voiceEnabled = value;
+                            if (voiceMessageController.text.trim().isEmpty) {
+                              voiceMessageController.text =
+                                  '{user} envio un ${commandAction.visualName}';
+                            }
+                          });
+                        },
+                      ),
+                      if (voiceEnabled) ...[
+                        const SizedBox(height: 12),
+                        TextField(
+                          controller: voiceMessageController,
+                          decoration: const InputDecoration(
+                            labelText: 'Texto para voz',
+                            hintText: '{user} envio un creeper',
+                            prefixIcon: Icon(Icons.spatial_audio_off),
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ],
                       if (commandAction.supportsArmor) ...[
                         const SizedBox(height: 12),
                         _EquipmentSection(
@@ -392,6 +487,8 @@ class RulesScreen extends StatelessWidget {
                         trigger: triggerController.text,
                         target: targetController.text,
                         command: commandController.text,
+                        voiceEnabled: voiceEnabled,
+                        voiceMessage: voiceMessageController.text,
                         enabled: rule.enabled,
                       );
                     } else {
@@ -400,6 +497,8 @@ class RulesScreen extends StatelessWidget {
                         trigger: triggerController.text,
                         target: targetController.text,
                         command: commandController.text,
+                        voiceEnabled: voiceEnabled,
+                        voiceMessage: voiceMessageController.text,
                         enabled: true,
                       );
                     }
@@ -418,6 +517,8 @@ class RulesScreen extends StatelessWidget {
     triggerController.dispose();
     targetController.dispose();
     playerController.dispose();
+    announcementController.dispose();
+    voiceMessageController.dispose();
     commandController.dispose();
   }
 }
@@ -449,6 +550,17 @@ _GiftOption _giftOptionForTrigger(String trigger) {
     }
   }
   return _customGiftOption;
+}
+
+String? _announcementFromCommand(String command) {
+  for (final line in command.split('\n')) {
+    final marker = ' run say ';
+    final markerIndex = line.indexOf(marker);
+    if (markerIndex >= 0) {
+      return line.substring(markerIndex + marker.length).trim();
+    }
+  }
+  return null;
 }
 
 class _GiftOption {
@@ -556,17 +668,31 @@ class _CommandAction {
     String selector,
     String coordinates, {
     _EquipmentOptions equipment = const _EquipmentOptions(),
+    _SpawnOptions spawnOptions = const _SpawnOptions(),
   }) {
+    final commandLines = <String>[
+      if (spawnOptions.announcementCommand.isNotEmpty)
+        'execute as $selector at @s run say ${spawnOptions.announcementCommand}',
+    ];
+    final spawnNbt = spawnOptions.toNbt();
+
     if (equipment.hasEquipment && supportsArmor) {
-      return equipment.buildEquippedMobCommand(
-        selector: selector,
-        coordinates: coordinates,
-        entity: entity,
+      commandLines.add(
+        equipment.buildEquippedMobCommand(
+          selector: selector,
+          coordinates: coordinates,
+          entity: entity,
+          spawnNbt: spawnNbt,
+        ),
       );
+      return commandLines.join('\n');
     }
 
-    final mergedNbt = _mergeNbt(nbt, equipment.toNbt());
-    return 'execute as $selector at @s run summon $entity $coordinates${mergedNbt.isEmpty ? '' : ' $mergedNbt'}';
+    final mergedNbt = _mergeNbt(_mergeNbt(nbt, equipment.toNbt()), spawnNbt);
+    commandLines.add(
+      'execute as $selector at @s run summon $entity $coordinates${mergedNbt.isEmpty ? '' : ' $mergedNbt'}',
+    );
+    return commandLines.join('\n');
   }
 
   String _mergeNbt(String baseNbt, String equipmentNbt) {
@@ -578,6 +704,26 @@ class _CommandAction {
     }
 
     return '${baseNbt.substring(0, baseNbt.length - 1)},${equipmentNbt.substring(1)}';
+  }
+}
+
+class _SpawnOptions {
+  const _SpawnOptions({this.customName = '', this.announcementCommand = ''});
+
+  final String customName;
+  final String announcementCommand;
+
+  String toNbt() {
+    final name = customName.trim();
+    if (name.isEmpty) {
+      return '';
+    }
+
+    final escapedName = name
+        .replaceAll(r'\', r'\\')
+        .replaceAll('"', r'\"')
+        .replaceAll("'", r"\'");
+    return "{CustomName:'{\"text\":\"$escapedName\"}',CustomNameVisible:1b}";
   }
 }
 
@@ -594,12 +740,14 @@ class _EquipmentOptions {
     required String selector,
     required String coordinates,
     required String entity,
+    String spawnNbt = '',
   }) {
     const tag = 'nivroy_equipped_spawn';
     final target =
         '@e[type=$entity,tag=$tag,sort=nearest,limit=1,distance=..8]';
+    final summonNbt = _mergeSummonNbt('{Tags:["$tag"]}', spawnNbt);
     final commands = <String>[
-      'execute as $selector at @s run summon $entity $coordinates {Tags:["$tag"]}',
+      'execute as $selector at @s run summon $entity $coordinates $summonNbt',
     ];
 
     for (final slot in _armorSlots) {
@@ -653,6 +801,14 @@ class _EquipmentOptions {
 
   String _itemNbt(String itemId) {
     return '{id:"$itemId",count:1}';
+  }
+
+  String _mergeSummonNbt(String baseNbt, String spawnNbt) {
+    if (spawnNbt.isEmpty) {
+      return baseNbt;
+    }
+
+    return '${baseNbt.substring(0, baseNbt.length - 1)},${spawnNbt.substring(1)}';
   }
 }
 
@@ -896,6 +1052,12 @@ class _RuleCard extends StatelessWidget {
               if (!rule.enabled)
                 const Chip(
                   label: Text('Apagado'),
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (rule.voiceEnabled)
+                const Chip(
+                  avatar: Icon(Icons.volume_up, size: 16),
+                  label: Text('Voz'),
                   visualDensity: VisualDensity.compact,
                 ),
             ],

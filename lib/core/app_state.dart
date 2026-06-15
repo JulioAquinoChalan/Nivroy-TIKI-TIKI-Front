@@ -5,10 +5,12 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_event.dart';
+import '../models/exaroton_server.dart';
 import '../models/health_status.dart';
 import '../models/minecraft_rule.dart';
 import '../services/api_service.dart';
 import '../services/servertap_service.dart';
+import '../services/voice_service.dart';
 import '../services/websocket_service.dart';
 
 class AppState extends ChangeNotifier {
@@ -16,6 +18,8 @@ class AppState extends ChangeNotifier {
   static const _tiktokUsernameKey = 'tiktok_username';
   static const _serverTapUrlKey = 'servertap_url';
   static const _serverTapKeyKey = 'servertap_key';
+  static const _exarotonTokenKey = 'exaroton_token';
+  static const _exarotonServerIdKey = 'exaroton_server_id';
   static const _authIdTokenKey = 'auth_id_token';
   static const _authRefreshTokenKey = 'auth_refresh_token';
   static const _authExpiresAtKey = 'auth_expires_at';
@@ -35,19 +39,34 @@ class AppState extends ChangeNotifier {
   static const _environmentServerTapKey = String.fromEnvironment(
     'SERVERTAP_KEY',
   );
+  static const _environmentExarotonToken = String.fromEnvironment(
+    'EXAROTON_API_TOKEN',
+  );
+  static const _environmentExarotonServerId = String.fromEnvironment(
+    'EXAROTON_SERVER_ID',
+  );
 
   final WebSocketService _webSocketService = WebSocketService();
+  final VoiceService _voiceService = VoiceService();
 
   String backendUrl = _env('BACKEND_URL', _environmentBackendUrl);
   String tiktokUsername = _env('TIKTOK_USERNAME', _environmentTikTokUsername);
   String serverTapUrl = _env('SERVERTAP_URL', _environmentServerTapUrl);
   String serverTapKey = _env('SERVERTAP_KEY', _environmentServerTapKey);
+  String exarotonToken = _env('EXAROTON_API_TOKEN', _environmentExarotonToken);
+  String exarotonServerId = _env(
+    'EXAROTON_SERVER_ID',
+    _environmentExarotonServerId,
+  );
   String? lastError;
   bool isBusy = false;
   bool isAutoConnectingTikTok = false;
   bool isAutoConnectingServerTap = false;
+  bool isLoadingExarotonServers = false;
   bool serverTapConnected = false;
   String serverTapServerName = '';
+  bool exarotonConnected = false;
+  String exarotonServerName = '';
   bool isInitialized = false;
   bool isAuthenticated = false;
   bool isEmailVerified = false;
@@ -57,12 +76,19 @@ class AppState extends ChangeNotifier {
   String _idToken = '';
   String _refreshToken = '';
   DateTime? _tokenExpiresAt;
+  Timer? _errorTimer;
   HealthStatus health = HealthStatus.offline();
   List<AppEvent> events = [];
   List<MinecraftRule> rules = [];
+  List<ExarotonServer> exarotonServers = [];
 
   static String _env(String key, String fallback) {
-    final value = dotenv.env[key]?.trim();
+    final String? value;
+    try {
+      value = dotenv.env[key]?.trim();
+    } catch (_) {
+      return fallback;
+    }
     return value == null || value.isEmpty ? fallback : value;
   }
 
@@ -83,8 +109,9 @@ class AppState extends ChangeNotifier {
     }
 
     final host = uri.host == 'localhost' ? '127.0.0.1' : uri.host;
-    return _withOverlayUser(uri.replace(host: host, path: '/overlay/rules'))
-        .toString();
+    return _withOverlayUser(
+      uri.replace(host: host, path: '/overlay/rules'),
+    ).toString();
   }
 
   Uri _withOverlayUser(Uri uri) {
@@ -92,10 +119,9 @@ class AppState extends ChangeNotifier {
       return uri.replace(query: '');
     }
 
-    return uri.replace(queryParameters: {
-      ...uri.queryParameters,
-      'uid': authUid,
-    });
+    return uri.replace(
+      queryParameters: {...uri.queryParameters, 'uid': authUid},
+    );
   }
 
   Future<void> initialize() async {
@@ -104,6 +130,9 @@ class AppState extends ChangeNotifier {
     tiktokUsername = prefs.getString(_tiktokUsernameKey) ?? tiktokUsername;
     serverTapUrl = prefs.getString(_serverTapUrlKey) ?? serverTapUrl;
     serverTapKey = prefs.getString(_serverTapKeyKey) ?? serverTapKey;
+    exarotonToken = prefs.getString(_exarotonTokenKey) ?? exarotonToken;
+    exarotonServerId =
+        prefs.getString(_exarotonServerIdKey) ?? exarotonServerId;
     _idToken = prefs.getString(_authIdTokenKey) ?? '';
     _refreshToken = prefs.getString(_authRefreshTokenKey) ?? '';
     authEmail = prefs.getString(_authEmailKey) ?? '';
@@ -125,6 +154,7 @@ class AppState extends ChangeNotifier {
     if (isAuthenticated && isEmailVerified) {
       await _autoConnectTikTok();
       await _autoConnectServerTap();
+      await _autoConnectExaroton();
     }
     isInitialized = true;
     notifyListeners();
@@ -139,11 +169,11 @@ class AppState extends ChangeNotifier {
       events = await _api.getEvents();
       rules = isAuthenticated && isEmailVerified ? await _api.getRules() : [];
       if (clearErrorOnSuccess) {
-        lastError = null;
+        _clearError();
       }
     } catch (error) {
       health = HealthStatus.offline();
-      lastError = error.toString();
+      _setError(error);
     }
     notifyListeners();
   }
@@ -173,7 +203,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> saveTikTokUsername(String username) async {
     tiktokUsername = _normalizeTikTokUsername(username);
-    lastError = null;
+    _clearError();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tiktokUsernameKey, tiktokUsername);
@@ -186,13 +216,91 @@ class AppState extends ChangeNotifier {
     required String key,
   }) async {
     _setServerTapConnection(url, key);
-    lastError = null;
+    _clearError();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_serverTapUrlKey, serverTapUrl);
     await prefs.setString(_serverTapKeyKey, serverTapKey);
 
     notifyListeners();
+  }
+
+  Future<void> saveExarotonConnection({
+    required String token,
+    required String serverId,
+  }) async {
+    exarotonToken = token.trim();
+    exarotonServerId = serverId.trim();
+    exarotonConnected = false;
+    exarotonServerName = '';
+    _clearError();
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_exarotonTokenKey, exarotonToken);
+    await prefs.setString(_exarotonServerIdKey, exarotonServerId);
+
+    notifyListeners();
+  }
+
+  Future<void> loadExarotonServers({String? token}) async {
+    if (!_canUseVerifiedAccount()) {
+      return;
+    }
+
+    final nextToken = token?.trim() ?? exarotonToken;
+    if (nextToken.isEmpty) {
+      _setError('Ingresa el token de Exaroton.');
+      notifyListeners();
+      return;
+    }
+
+    isLoadingExarotonServers = true;
+    _clearError();
+    notifyListeners();
+
+    try {
+      await _refreshSessionIfNeeded();
+      exarotonToken = nextToken;
+      exarotonServers = await _api.getExarotonServers(token: exarotonToken);
+      if (exarotonServerId.isEmpty && exarotonServers.isNotEmpty) {
+        exarotonServerId = exarotonServers.first.id;
+      }
+      await _persistExarotonConnection();
+    } catch (error) {
+      _setError(error);
+    } finally {
+      isLoadingExarotonServers = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> selectExarotonServer(String? serverId) async {
+    exarotonServerId = serverId?.trim() ?? '';
+    exarotonConnected = false;
+    exarotonServerName = '';
+    _clearError();
+    await _persistExarotonConnection();
+    notifyListeners();
+  }
+
+  Future<void> connectExaroton() async {
+    if (!_canUseVerifiedAccount()) {
+      return;
+    }
+    final succeeded = await _runAction(_connectExaroton);
+    await refresh(clearErrorOnSuccess: succeeded);
+  }
+
+  Future<void> testExarotonCommand() async {
+    if (!_canUseVerifiedAccount()) {
+      return;
+    }
+    final succeeded = await _runAction(
+      () => _executeExarotonCommand(
+        'say Nivroy TIKI-TIKI conectado por Exaroton',
+      ),
+    );
+    await refresh(clearErrorOnSuccess: succeeded);
   }
 
   void connectWebSocket() {
@@ -202,15 +310,15 @@ class AppState extends ChangeNotifier {
         onEvent: _handleEvent,
         onError: (error) {
           websocketConnected = false;
-          lastError = error.toString();
+          _setError(error);
           notifyListeners();
         },
       );
       websocketConnected = true;
-      lastError = null;
+      _clearError();
     } catch (error) {
       websocketConnected = false;
-      lastError = error.toString();
+      _setError(error);
     }
     notifyListeners();
   }
@@ -295,9 +403,14 @@ class AppState extends ChangeNotifier {
     if (!_canUseVerifiedAccount()) {
       return;
     }
-    final succeeded = await _runAction(
-      () => _executeServerTapCommand(rule.command),
-    );
+    final succeeded = await _runAction(() async {
+      if (exarotonConnected) {
+        await _executeExarotonCommand(rule.command);
+      } else {
+        await _executeServerTapCommand(rule.command);
+      }
+      await _speakRuleForTest(rule);
+    });
     await refresh(clearErrorOnSuccess: succeeded);
   }
 
@@ -306,6 +419,8 @@ class AppState extends ChangeNotifier {
     required String trigger,
     required String command,
     required String target,
+    required bool voiceEnabled,
+    required String voiceMessage,
     bool enabled = true,
   }) async {
     if (!_canUseVerifiedAccount()) {
@@ -317,6 +432,8 @@ class AppState extends ChangeNotifier {
         trigger: trigger,
         command: command,
         target: target,
+        voiceEnabled: voiceEnabled,
+        voiceMessage: voiceMessage,
         enabled: enabled,
       ),
     );
@@ -329,6 +446,8 @@ class AppState extends ChangeNotifier {
     required String trigger,
     required String command,
     required String target,
+    required bool voiceEnabled,
+    required String voiceMessage,
     required bool enabled,
   }) async {
     if (!_canUseVerifiedAccount()) {
@@ -341,6 +460,8 @@ class AppState extends ChangeNotifier {
         trigger: trigger,
         command: command,
         target: target,
+        voiceEnabled: voiceEnabled,
+        voiceMessage: voiceMessage,
         enabled: enabled,
       ),
     );
@@ -424,12 +545,12 @@ class AppState extends ChangeNotifier {
     isAuthenticated = false;
     isEmailVerified = false;
     rules = [];
-    lastError = null;
+    _clearError();
   }
 
   Future<bool> _runAction(Future<void> Function() action) async {
     isBusy = true;
-    lastError = null;
+    _clearError();
     notifyListeners();
 
     try {
@@ -439,7 +560,7 @@ class AppState extends ChangeNotifier {
       await action();
       return true;
     } catch (error) {
-      lastError = error.toString();
+      _setError(error);
       return false;
     } finally {
       isBusy = false;
@@ -449,12 +570,12 @@ class AppState extends ChangeNotifier {
 
   bool _canUseVerifiedAccount() {
     if (!isAuthenticated) {
-      lastError = 'Inicia sesion para continuar.';
+      _setError('Inicia sesion para continuar.');
       notifyListeners();
       return false;
     }
     if (!isEmailVerified) {
-      lastError = 'Verifica tu correo antes de continuar.';
+      _setError('Verifica tu correo antes de continuar.');
       notifyListeners();
       return false;
     }
@@ -521,11 +642,18 @@ class AppState extends ChangeNotifier {
     serverTapKey = key.trim();
   }
 
+  Future<void> _persistExarotonConnection() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_exarotonTokenKey, exarotonToken);
+    await prefs.setString(_exarotonServerIdKey, exarotonServerId);
+  }
+
   void _handleEvent(AppEvent event) {
     events = [event, ...events].take(100).toList();
     if (event.type == 'connected' && event.source == 'websocket') {
       websocketConnected = true;
     }
+    unawaited(_speakRulesForEvent(event));
     unawaited(_runRulesForEvent(event));
     notifyListeners();
   }
@@ -534,15 +662,69 @@ class AppState extends ChangeNotifier {
     final server = await _serverTap.getServer();
     serverTapConnected = true;
     serverTapServerName = server['name']?.toString() ?? 'ServerTap';
+    exarotonConnected = false;
   }
 
   Future<void> _executeServerTapCommand(String command) async {
     await _serverTap.runCommand(command);
     serverTapConnected = true;
+    exarotonConnected = false;
+  }
+
+  Future<void> _autoConnectExaroton() async {
+    if (exarotonToken.isEmpty ||
+        exarotonServerId.isEmpty ||
+        exarotonConnected ||
+        isBusy) {
+      return;
+    }
+
+    await _runAction(_connectExaroton);
+  }
+
+  Future<void> _connectExaroton() async {
+    if (exarotonToken.isEmpty) {
+      throw Exception('Ingresa el token de Exaroton.');
+    }
+    if (exarotonServerId.isEmpty) {
+      if (exarotonServers.isEmpty) {
+        exarotonServers = await _api.getExarotonServers(token: exarotonToken);
+      }
+      if (exarotonServers.isNotEmpty) {
+        exarotonServerId = exarotonServers.first.id;
+      }
+    }
+    if (exarotonServerId.isEmpty) {
+      throw Exception('Selecciona un servidor Exaroton.');
+    }
+
+    await _executeExarotonCommand(
+      'say Nivroy TIKI-TIKI conectado por Exaroton',
+    );
+  }
+
+  Future<void> _executeExarotonCommand(String command) async {
+    await _api.sendMinecraftCommand(
+      provider: 'exaroton',
+      command: command,
+      exarotonToken: exarotonToken,
+      serverId: exarotonServerId,
+    );
+    exarotonConnected = true;
+    serverTapConnected = false;
+    ExarotonServer? selectedServer;
+    for (final server in exarotonServers) {
+      if (server.id == exarotonServerId) {
+        selectedServer = server;
+        break;
+      }
+    }
+    exarotonServerName = selectedServer?.name ?? 'Exaroton';
+    await _persistExarotonConnection();
   }
 
   Future<void> _runRulesForEvent(AppEvent event) async {
-    if (!_canUseVerifiedAccount() || !serverTapConnected) {
+    if (!_canUseVerifiedAccount() || !serverTapConnected || exarotonConnected) {
       return;
     }
 
@@ -551,12 +733,52 @@ class AppState extends ChangeNotifier {
       try {
         await _executeServerTapCommand(_commandForEvent(rule.command, event));
       } catch (error) {
-        lastError = error.toString();
+        _setError(error);
         serverTapConnected = false;
         notifyListeners();
         return;
       }
     }
+  }
+
+  Future<void> _speakRulesForEvent(AppEvent event) async {
+    if (!_isTikTokRuleEvent(event)) {
+      return;
+    }
+
+    final matchedRules = rules.where(
+      (rule) => rule.voiceEnabled && _matchesEvent(rule, event),
+    );
+    for (final rule in matchedRules) {
+      final message = _commandForEvent(rule.voiceMessage, event);
+      if (message.trim().isEmpty) {
+        continue;
+      }
+      await _voiceService.speak(message);
+    }
+  }
+
+  Future<void> _speakRuleForTest(MinecraftRule rule) async {
+    if (!rule.voiceEnabled) {
+      return;
+    }
+
+    final message = rule.voiceMessage
+        .replaceAll('{user}', 'test_user')
+        .replaceAll('{username}', 'test_user')
+        .replaceAll('{detail}', rule.trigger);
+    await _voiceService.speak(message);
+  }
+
+  bool _isTikTokRuleEvent(AppEvent event) {
+    return const {
+      'gift',
+      'like',
+      'follow',
+      'member',
+      'share',
+      'chat',
+    }.contains(event.type);
   }
 
   bool _matchesEvent(MinecraftRule rule, AppEvent event) {
@@ -585,8 +807,24 @@ class AppState extends ChangeNotifier {
         .replaceAll('{detail}', event.detail ?? '');
   }
 
+  void _setError(Object error) {
+    lastError = error.toString();
+    _errorTimer?.cancel();
+    _errorTimer = Timer(const Duration(seconds: 3), () {
+      lastError = null;
+      notifyListeners();
+    });
+  }
+
+  void _clearError() {
+    _errorTimer?.cancel();
+    _errorTimer = null;
+    lastError = null;
+  }
+
   @override
   void dispose() {
+    _errorTimer?.cancel();
     _webSocketService.disconnect();
     super.dispose();
   }

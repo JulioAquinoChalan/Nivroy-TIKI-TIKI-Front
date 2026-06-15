@@ -6,6 +6,8 @@ class MinecraftRule {
     required this.command,
     required this.target,
     required this.enabled,
+    required this.voiceEnabled,
+    required this.voiceMessage,
   });
 
   final String id;
@@ -14,6 +16,8 @@ class MinecraftRule {
   final String command;
   final String target;
   final bool enabled;
+  final bool voiceEnabled;
+  final String voiceMessage;
 
   factory MinecraftRule.fromJson(Map<String, dynamic> json) {
     return MinecraftRule(
@@ -23,6 +27,8 @@ class MinecraftRule {
       command: json['command']?.toString() ?? '',
       target: json['target']?.toString() ?? '',
       enabled: json['enabled'] != false,
+      voiceEnabled: json['voiceEnabled'] == true,
+      voiceMessage: json['voiceMessage']?.toString() ?? '',
     );
   }
 
@@ -34,6 +40,8 @@ class MinecraftRule {
       'command': command,
       'target': target,
       'enabled': enabled,
+      'voiceEnabled': voiceEnabled,
+      'voiceMessage': voiceMessage,
     };
   }
 }

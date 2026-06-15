@@ -15,8 +15,8 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   late final TextEditingController _backendUrlController;
   late final TextEditingController _tiktokUsernameController;
-  late final TextEditingController _minecraftHostController;
-  late final TextEditingController _minecraftPortController;
+  late final TextEditingController _serverTapUrlController;
+  late final TextEditingController _serverTapKeyController;
 
   @override
   void initState() {
@@ -26,20 +26,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _tiktokUsernameController = TextEditingController(
       text: appState.tiktokUsername,
     );
-    _minecraftHostController = TextEditingController(
-      text: appState.minecraftHost,
-    );
-    _minecraftPortController = TextEditingController(
-      text: appState.minecraftPort.toString(),
-    );
+    _serverTapUrlController = TextEditingController(text: appState.serverTapUrl);
+    _serverTapKeyController = TextEditingController(text: appState.serverTapKey);
   }
 
   @override
   void dispose() {
     _backendUrlController.dispose();
     _tiktokUsernameController.dispose();
-    _minecraftHostController.dispose();
-    _minecraftPortController.dispose();
+    _serverTapUrlController.dispose();
+    _serverTapKeyController.dispose();
     super.dispose();
   }
 
@@ -99,20 +95,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _minecraftHostController,
+                  controller: _serverTapUrlController,
                   decoration: const InputDecoration(
-                    labelText: 'IP o host Minecraft',
+                    labelText: 'URL ServerTap',
+                    hintText: 'http://127.0.0.1:4567',
                     prefixIcon: Icon(Icons.router),
                     border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
                 TextField(
-                  controller: _minecraftPortController,
-                  keyboardType: TextInputType.number,
+                  controller: _serverTapKeyController,
+                  obscureText: true,
                   decoration: const InputDecoration(
-                    labelText: 'Puerto RCON Minecraft',
-                    prefixIcon: Icon(Icons.tag),
+                    labelText: 'API key ServerTap',
+                    prefixIcon: Icon(Icons.key),
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -125,8 +122,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         : () => appState.saveSettings(
                             newBackendUrl: _backendUrlController.text,
                             newTikTokUsername: _tiktokUsernameController.text,
-                            newMinecraftHost: _minecraftHostController.text,
-                            newMinecraftPort: _minecraftPortController.text,
+                            newServerTapUrl: _serverTapUrlController.text,
+                            newServerTapKey: _serverTapKeyController.text,
                           ),
                     icon: const Icon(Icons.save),
                     label: const Text('Guardar'),

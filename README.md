@@ -14,7 +14,7 @@ Flutter app multiplataforma con Material 3, tema oscuro y dashboard para control
 
 ```bash
 flutter pub get
-flutter run -d chrome
+flutter run -d chrome --dart-define-from-file=.env
 ```
 
 ## Estructura
@@ -32,8 +32,8 @@ lib/models/
 
 ## Pantallas
 
-- Dashboard: estados, usuario TikTok, IP/host Minecraft, puerto RCON y acciones principales.
-- Rules: reglas de regalos a comandos, pruebas manuales por RCON y creacion de comandos propios.
+- Dashboard: estados, usuario TikTok, URL de ServerTap y acciones principales.
+- Rules: reglas de regalos a comandos, pruebas manuales por ServerTap y creacion de comandos propios.
 - Events: eventos recibidos en tiempo real por WebSocket.
 - Settings: URL del backend, usuario TikTok e IP/puerto Minecraft guardados con `shared_preferences`.
 

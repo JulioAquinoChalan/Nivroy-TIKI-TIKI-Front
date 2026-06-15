@@ -1,48 +1,53 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/app_event.dart';
 import '../models/health_status.dart';
 import '../models/minecraft_rule.dart';
 import '../services/api_service.dart';
+import '../services/servertap_service.dart';
 import '../services/websocket_service.dart';
 
 class AppState extends ChangeNotifier {
   static const _backendUrlKey = 'backend_url';
   static const _tiktokUsernameKey = 'tiktok_username';
-  static const _minecraftHostKey = 'minecraft_host';
-  static const _minecraftPortKey = 'minecraft_port';
+  static const _serverTapUrlKey = 'servertap_url';
+  static const _serverTapKeyKey = 'servertap_key';
   static const _authIdTokenKey = 'auth_id_token';
   static const _authRefreshTokenKey = 'auth_refresh_token';
   static const _authExpiresAtKey = 'auth_expires_at';
   static const _authEmailKey = 'auth_email';
   static const _authUidKey = 'auth_uid';
-  static const _defaultBackendUrl = String.fromEnvironment(
+  static const _environmentBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
     defaultValue: 'http://localhost:3000',
   );
-  static const _defaultTikTokUsername = String.fromEnvironment(
+  static const _environmentTikTokUsername = String.fromEnvironment(
     'TIKTOK_USERNAME',
   );
-  static const _defaultMinecraftHost = String.fromEnvironment(
-    'MINECRAFT_HOST',
-    defaultValue: '127.0.0.1',
+  static const _environmentServerTapUrl = String.fromEnvironment(
+    'SERVERTAP_URL',
+    defaultValue: 'http://127.0.0.1:4567',
   );
-  static const _defaultMinecraftPort = int.fromEnvironment(
-    'MINECRAFT_PORT',
-    defaultValue: 25575,
+  static const _environmentServerTapKey = String.fromEnvironment(
+    'SERVERTAP_KEY',
   );
 
   final WebSocketService _webSocketService = WebSocketService();
 
-  String backendUrl = _defaultBackendUrl;
-  String tiktokUsername = _defaultTikTokUsername;
-  String minecraftHost = _defaultMinecraftHost;
-  int minecraftPort = _defaultMinecraftPort;
+  String backendUrl = _env('BACKEND_URL', _environmentBackendUrl);
+  String tiktokUsername = _env('TIKTOK_USERNAME', _environmentTikTokUsername);
+  String serverTapUrl = _env('SERVERTAP_URL', _environmentServerTapUrl);
+  String serverTapKey = _env('SERVERTAP_KEY', _environmentServerTapKey);
   String? lastError;
   bool isBusy = false;
   bool isAutoConnectingTikTok = false;
-  bool isAutoConnectingMinecraft = false;
+  bool isAutoConnectingServerTap = false;
+  bool serverTapConnected = false;
+  String serverTapServerName = '';
   bool isInitialized = false;
   bool isAuthenticated = false;
   bool isEmailVerified = false;
@@ -56,9 +61,21 @@ class AppState extends ChangeNotifier {
   List<AppEvent> events = [];
   List<MinecraftRule> rules = [];
 
+  static String _env(String key, String fallback) {
+    final value = dotenv.env[key]?.trim();
+    return value == null || value.isEmpty ? fallback : value;
+  }
+
   ApiService get _api => ApiService(backendUrl, idToken: _idToken);
-  String get overlayRulesUrl =>
-      '${backendUrl.replaceAll(RegExp(r'/$'), '')}/overlay/rules';
+  ServerTapService get _serverTap =>
+      ServerTapService(baseUrl: serverTapUrl, key: serverTapKey);
+  String get overlayRulesUrl {
+    final uri = Uri.parse(
+      '${backendUrl.replaceAll(RegExp(r'/$'), '')}/overlay/rules',
+    );
+    return _withOverlayUser(uri).toString();
+  }
+
   String get overlayLiveStudioUrl {
     final uri = Uri.tryParse(backendUrl);
     if (uri == null) {
@@ -66,17 +83,27 @@ class AppState extends ChangeNotifier {
     }
 
     final host = uri.host == 'localhost' ? '127.0.0.1' : uri.host;
-    return uri
-        .replace(host: host, path: '/overlay/rules', query: '')
+    return _withOverlayUser(uri.replace(host: host, path: '/overlay/rules'))
         .toString();
+  }
+
+  Uri _withOverlayUser(Uri uri) {
+    if (authUid.isEmpty) {
+      return uri.replace(query: '');
+    }
+
+    return uri.replace(queryParameters: {
+      ...uri.queryParameters,
+      'uid': authUid,
+    });
   }
 
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     backendUrl = prefs.getString(_backendUrlKey) ?? backendUrl;
     tiktokUsername = prefs.getString(_tiktokUsernameKey) ?? tiktokUsername;
-    minecraftHost = prefs.getString(_minecraftHostKey) ?? minecraftHost;
-    minecraftPort = prefs.getInt(_minecraftPortKey) ?? minecraftPort;
+    serverTapUrl = prefs.getString(_serverTapUrlKey) ?? serverTapUrl;
+    serverTapKey = prefs.getString(_serverTapKeyKey) ?? serverTapKey;
     _idToken = prefs.getString(_authIdTokenKey) ?? '';
     _refreshToken = prefs.getString(_authRefreshTokenKey) ?? '';
     authEmail = prefs.getString(_authEmailKey) ?? '';
@@ -97,7 +124,7 @@ class AppState extends ChangeNotifier {
     connectWebSocket();
     if (isAuthenticated && isEmailVerified) {
       await _autoConnectTikTok();
-      await _autoConnectMinecraft();
+      await _autoConnectServerTap();
     }
     isInitialized = true;
     notifyListeners();
@@ -124,22 +151,23 @@ class AppState extends ChangeNotifier {
   Future<void> saveSettings({
     required String newBackendUrl,
     required String newTikTokUsername,
-    required String newMinecraftHost,
-    required String newMinecraftPort,
+    required String newServerTapUrl,
+    required String newServerTapKey,
   }) async {
     backendUrl = newBackendUrl.trim().isEmpty
         ? backendUrl
         : newBackendUrl.trim();
     tiktokUsername = _normalizeTikTokUsername(newTikTokUsername);
-    _setMinecraftConnection(newMinecraftHost, newMinecraftPort);
+    _setServerTapConnection(newServerTapUrl, newServerTapKey);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_backendUrlKey, backendUrl);
     await prefs.setString(_tiktokUsernameKey, tiktokUsername);
-    await prefs.setString(_minecraftHostKey, minecraftHost);
-    await prefs.setInt(_minecraftPortKey, minecraftPort);
+    await prefs.setString(_serverTapUrlKey, serverTapUrl);
+    await prefs.setString(_serverTapKeyKey, serverTapKey);
 
     connectWebSocket();
+    await connectServerTap();
     await refresh();
   }
 
@@ -153,16 +181,16 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> saveMinecraftConnection({
-    required String host,
-    required String port,
+  Future<void> saveServerTapConnection({
+    required String url,
+    required String key,
   }) async {
-    _setMinecraftConnection(host, port);
+    _setServerTapConnection(url, key);
     lastError = null;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_minecraftHostKey, minecraftHost);
-    await prefs.setInt(_minecraftPortKey, minecraftPort);
+    await prefs.setString(_serverTapUrlKey, serverTapUrl);
+    await prefs.setString(_serverTapKeyKey, serverTapKey);
 
     notifyListeners();
   }
@@ -227,50 +255,37 @@ class AppState extends ChangeNotifier {
     await refresh(clearErrorOnSuccess: succeeded);
   }
 
-  Future<void> connectMinecraft() async {
+  Future<void> connectServerTap() async {
     if (!_canUseVerifiedAccount()) {
       return;
     }
-    final succeeded = await _runAction(
-      () => _api.connectMinecraft(
-        minecraftHost: minecraftHost,
-        minecraftPort: minecraftPort,
-      ),
-    );
+    final succeeded = await _runAction(_connectServerTap);
     await refresh(clearErrorOnSuccess: succeeded);
   }
 
-  Future<void> _autoConnectMinecraft() async {
-    if (minecraftHost.isEmpty ||
-        health.minecraftConnected ||
+  Future<void> _autoConnectServerTap() async {
+    if (serverTapUrl.isEmpty ||
+        serverTapConnected ||
         isBusy ||
-        isAutoConnectingMinecraft) {
+        isAutoConnectingServerTap) {
       return;
     }
 
-    isAutoConnectingMinecraft = true;
+    isAutoConnectingServerTap = true;
     notifyListeners();
 
-    final succeeded = await _runAction(
-      () => _api.connectMinecraft(
-        minecraftHost: minecraftHost,
-        minecraftPort: minecraftPort,
-      ),
-    );
-    isAutoConnectingMinecraft = false;
+    final succeeded = await _runAction(_connectServerTap);
+    isAutoConnectingServerTap = false;
     await refresh(clearErrorOnSuccess: succeeded);
   }
 
-  Future<void> testMinecraftCommand() async {
+  Future<void> testServerTapCommand() async {
     if (!_canUseVerifiedAccount()) {
       return;
     }
     final succeeded = await _runAction(
-      () => _api.executeMinecraftCommand(
-        'say Nivroy TIKI-TIKI conectado por {user}',
-        username: tiktokUsername.isEmpty ? 'dashboard' : tiktokUsername,
-        minecraftHost: minecraftHost,
-        minecraftPort: minecraftPort,
+      () => _executeServerTapCommand(
+        'say Nivroy TIKI-TIKI conectado por ${tiktokUsername.isEmpty ? 'dashboard' : tiktokUsername}',
       ),
     );
     await refresh(clearErrorOnSuccess: succeeded);
@@ -281,12 +296,7 @@ class AppState extends ChangeNotifier {
       return;
     }
     final succeeded = await _runAction(
-      () => _api.executeMinecraftCommand(
-        rule.command,
-        username: tiktokUsername.isEmpty ? 'rules' : tiktokUsername,
-        minecraftHost: minecraftHost,
-        minecraftPort: minecraftPort,
-      ),
+      () => _executeServerTapCommand(rule.command),
     );
     await refresh(clearErrorOnSuccess: succeeded);
   }
@@ -503,17 +513,12 @@ class AppState extends ChangeNotifier {
     return username.trim().replaceFirst('@', '');
   }
 
-  void _setMinecraftConnection(String host, String port) {
-    final nextHost = host.trim();
-    final nextPort = int.tryParse(port.trim());
-
-    if (nextHost.isNotEmpty) {
-      minecraftHost = nextHost;
+  void _setServerTapConnection(String url, String key) {
+    final nextUrl = url.trim();
+    if (nextUrl.isNotEmpty) {
+      serverTapUrl = nextUrl;
     }
-
-    if (nextPort != null && nextPort >= 1 && nextPort <= 65535) {
-      minecraftPort = nextPort;
-    }
+    serverTapKey = key.trim();
   }
 
   void _handleEvent(AppEvent event) {
@@ -521,7 +526,63 @@ class AppState extends ChangeNotifier {
     if (event.type == 'connected' && event.source == 'websocket') {
       websocketConnected = true;
     }
+    unawaited(_runRulesForEvent(event));
     notifyListeners();
+  }
+
+  Future<void> _connectServerTap() async {
+    final server = await _serverTap.getServer();
+    serverTapConnected = true;
+    serverTapServerName = server['name']?.toString() ?? 'ServerTap';
+  }
+
+  Future<void> _executeServerTapCommand(String command) async {
+    await _serverTap.runCommand(command);
+    serverTapConnected = true;
+  }
+
+  Future<void> _runRulesForEvent(AppEvent event) async {
+    if (!_canUseVerifiedAccount() || !serverTapConnected) {
+      return;
+    }
+
+    final matchedRules = rules.where((rule) => _matchesEvent(rule, event));
+    for (final rule in matchedRules) {
+      try {
+        await _executeServerTapCommand(_commandForEvent(rule.command, event));
+      } catch (error) {
+        lastError = error.toString();
+        serverTapConnected = false;
+        notifyListeners();
+        return;
+      }
+    }
+  }
+
+  bool _matchesEvent(MinecraftRule rule, AppEvent event) {
+    if (!rule.enabled || rule.eventType != event.type) {
+      return false;
+    }
+
+    final trigger = rule.trigger.trim().toLowerCase();
+    if (trigger.isEmpty ||
+        rule.eventType == 'like' ||
+        rule.eventType == 'follow' ||
+        rule.eventType == 'member' ||
+        rule.eventType == 'share') {
+      return true;
+    }
+
+    final detail = event.detail?.trim().toLowerCase() ?? '';
+    return detail == trigger || detail.contains(trigger);
+  }
+
+  String _commandForEvent(String command, AppEvent event) {
+    final username = event.user ?? tiktokUsername;
+    return command
+        .replaceAll('{user}', username)
+        .replaceAll('{username}', username)
+        .replaceAll('{detail}', event.detail ?? '');
   }
 
   @override

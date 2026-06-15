@@ -12,8 +12,8 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   late final TextEditingController _tiktokUsernameController;
-  late final TextEditingController _minecraftHostController;
-  late final TextEditingController _minecraftPortController;
+  late final TextEditingController _serverTapUrlController;
+  late final TextEditingController _serverTapKeyController;
 
   @override
   void initState() {
@@ -22,19 +22,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _tiktokUsernameController = TextEditingController(
       text: appState.tiktokUsername,
     );
-    _minecraftHostController = TextEditingController(
-      text: appState.minecraftHost,
-    );
-    _minecraftPortController = TextEditingController(
-      text: appState.minecraftPort.toString(),
-    );
+    _serverTapUrlController = TextEditingController(text: appState.serverTapUrl);
+    _serverTapKeyController = TextEditingController(text: appState.serverTapKey);
   }
 
   @override
   void dispose() {
     _tiktokUsernameController.dispose();
-    _minecraftHostController.dispose();
-    _minecraftPortController.dispose();
+    _serverTapUrlController.dispose();
+    _serverTapKeyController.dispose();
     super.dispose();
   }
 
@@ -46,12 +42,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         appState.tiktokUsername.isNotEmpty) {
       _tiktokUsernameController.text = appState.tiktokUsername;
     }
-    if (_minecraftHostController.text.isEmpty &&
-        appState.minecraftHost.isNotEmpty) {
-      _minecraftHostController.text = appState.minecraftHost;
+    if (_serverTapUrlController.text.isEmpty &&
+        appState.serverTapUrl.isNotEmpty) {
+      _serverTapUrlController.text = appState.serverTapUrl;
     }
-    if (_minecraftPortController.text.isEmpty) {
-      _minecraftPortController.text = appState.minecraftPort.toString();
+    if (_serverTapKeyController.text.isEmpty &&
+        appState.serverTapKey.isNotEmpty) {
+      _serverTapKeyController.text = appState.serverTapKey;
     }
 
     return ListView(
@@ -85,12 +82,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             _StatusCard(
               label: 'Minecraft',
-              value: appState.isAutoConnectingMinecraft
+              value: appState.isAutoConnectingServerTap
                   ? 'Conectando...'
-                  : appState.health.minecraftConnected
-                  ? 'RCON listo'
+                  : appState.serverTapConnected
+                  ? 'ServerTap listo'
                   : 'Sin conexion',
-              active: appState.health.minecraftConnected,
+              active: appState.serverTapConnected,
               icon: Icons.sports_esports,
             ),
           ],
@@ -103,7 +100,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Usuario TikTok',
+                  'Conexion local',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -129,39 +126,38 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       ),
                     ),
                     SizedBox(
-                      width: 300,
+                      width: 320,
                       child: TextField(
-                        controller: _minecraftHostController,
+                        controller: _serverTapUrlController,
                         enabled: !appState.isBusy,
                         textInputAction: TextInputAction.next,
                         decoration: const InputDecoration(
-                          labelText: 'IP o host Minecraft',
-                          hintText: '127.0.0.1',
+                          labelText: 'URL ServerTap',
+                          hintText: 'http://127.0.0.1:4567',
                           prefixIcon: Icon(Icons.router),
                           border: OutlineInputBorder(),
                         ),
-                        onChanged: (value) => appState.saveMinecraftConnection(
-                          host: value,
-                          port: _minecraftPortController.text,
+                        onChanged: (value) => appState.saveServerTapConnection(
+                          url: value,
+                          key: _serverTapKeyController.text,
                         ),
                       ),
                     ),
                     SizedBox(
-                      width: 180,
+                      width: 260,
                       child: TextField(
-                        controller: _minecraftPortController,
+                        controller: _serverTapKeyController,
                         enabled: !appState.isBusy,
-                        keyboardType: TextInputType.number,
+                        obscureText: true,
                         textInputAction: TextInputAction.done,
                         decoration: const InputDecoration(
-                          labelText: 'Puerto RCON',
-                          hintText: '25575',
-                          prefixIcon: Icon(Icons.tag),
+                          labelText: 'API key ServerTap',
+                          prefixIcon: Icon(Icons.key),
                           border: OutlineInputBorder(),
                         ),
-                        onChanged: (value) => appState.saveMinecraftConnection(
-                          host: _minecraftHostController.text,
-                          port: value,
+                        onChanged: (value) => appState.saveServerTapConnection(
+                          url: _serverTapUrlController.text,
+                          key: value,
                         ),
                       ),
                     ),
@@ -191,16 +187,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     FilledButton.tonalIcon(
                       onPressed: appState.isBusy
                           ? null
-                          : appState.connectMinecraft,
+                          : appState.connectServerTap,
                       icon: const Icon(Icons.router),
-                      label: const Text('Conectar Minecraft'),
+                      label: const Text('Conectar ServerTap'),
                     ),
                     OutlinedButton.icon(
                       onPressed: appState.isBusy
                           ? null
-                          : appState.testMinecraftCommand,
+                          : appState.testServerTapCommand,
                       icon: const Icon(Icons.terminal),
-                      label: const Text('Probar comando Minecraft'),
+                      label: const Text('Probar comando'),
                     ),
                   ],
                 ),

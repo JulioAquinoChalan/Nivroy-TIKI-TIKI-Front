@@ -172,30 +172,6 @@ class ApiService {
     await _post('/tiktok/disconnect', {});
   }
 
-  Future<void> connectMinecraft({
-    required String minecraftHost,
-    required int minecraftPort,
-  }) async {
-    await _post('/minecraft/connect', {
-      'minecraftHost': minecraftHost,
-      'minecraftPort': minecraftPort,
-    });
-  }
-
-  Future<void> executeMinecraftCommand(
-    String command, {
-    String username = 'dashboard',
-    required String minecraftHost,
-    required int minecraftPort,
-  }) async {
-    await _post('/minecraft/command', {
-      'command': command,
-      'username': username,
-      'minecraftHost': minecraftHost,
-      'minecraftPort': minecraftPort,
-    });
-  }
-
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> body, {

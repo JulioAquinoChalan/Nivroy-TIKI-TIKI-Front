@@ -1,9 +1,9 @@
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-
 import 'servertap_cookie_stub.dart'
     if (dart.library.html) 'servertap_cookie_web.dart';
+import 'servertap_transport_stub.dart'
+    if (dart.library.html) 'servertap_transport_web.dart';
 
 class ServerTapService {
   ServerTapService({required this.baseUrl, this.key});
@@ -26,7 +26,11 @@ class ServerTapService {
 
   Future<Map<String, dynamic>> getServer() async {
     setServerTapCookie(key ?? '');
-    final response = await http.get(_uri('/v1/server'), headers: _headers);
+    final response = await serverTapRequest(
+      _uri('/v1/server'),
+      method: 'GET',
+      headers: _headers,
+    );
     final decoded = response.body.isEmpty
         ? <String, dynamic>{}
         : jsonDecode(response.body);
@@ -49,8 +53,9 @@ class ServerTapService {
     }
 
     for (final line in commands) {
-      final response = await http.post(
+      final response = await serverTapRequest(
         _uri('/v1/server/exec'),
+        method: 'POST',
         headers: _formHeaders,
         body: {'command': line, 'time': '0'},
       );

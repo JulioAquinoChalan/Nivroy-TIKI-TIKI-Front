@@ -225,6 +225,13 @@ class ApiService {
     });
   }
 
+  Future<void> sendRuleOverlayTest({
+    required String ruleId,
+    required String command,
+  }) async {
+    await _post('/rules/$ruleId/test-overlay', {'command': command});
+  }
+
   Future<Map<String, dynamic>> _post(
     String path,
     Map<String, dynamic> body, {

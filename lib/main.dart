@@ -8,6 +8,7 @@ import 'features/dashboard/dashboard_screen.dart';
 import 'features/events/events_screen.dart';
 import 'features/rules/rules_screen.dart';
 import 'features/settings/settings_screen.dart';
+import 'features/tutorial/tutorial_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -86,6 +87,7 @@ class _AppShellState extends State<AppShell> {
     DashboardScreen(),
     RulesScreen(),
     EventsScreen(),
+    TutorialScreen(),
     SettingsScreen(),
   ];
 
@@ -111,6 +113,11 @@ class _AppShellState extends State<AppShell> {
             icon: Icon(Icons.bolt_outlined),
             selectedIcon: Icon(Icons.bolt),
             label: 'Events',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.school_outlined),
+            selectedIcon: Icon(Icons.school),
+            label: 'Tutorial',
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),

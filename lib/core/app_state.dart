@@ -36,7 +36,10 @@ class AppState extends ChangeNotifier {
     'SERVERTAP_URL',
     defaultValue: 'http://127.0.0.1:4567',
   );
-  static const _defaultServerTapUrl = 'http://127.0.0.1:4567';
+  static const _defaultServerTapHost = '127.0.0.1';
+  static const _defaultServerTapPort = '4567';
+  static const _defaultServerTapUrl =
+      'http://$_defaultServerTapHost:$_defaultServerTapPort';
   static const _environmentServerTapKey = String.fromEnvironment(
     'SERVERTAP_KEY',
   );
@@ -95,23 +98,60 @@ class AppState extends ChangeNotifier {
 
   static String _initialServerTapUrl() {
     final url = _env('SERVERTAP_URL', _environmentServerTapUrl);
-    return _isBlockedDefaultServerTapUrl(url) ? '' : url;
+    return _normalizeServerTapUrl(url);
   }
 
-  static bool _isBlockedDefaultServerTapUrl(String url) {
-    if (!kIsWeb || url != _defaultServerTapUrl) {
-      return false;
+  static String _normalizeServerTapUrl(String url) {
+    final trimmed = url.trim();
+    final rawUrl = trimmed.isEmpty ? _defaultServerTapUrl : trimmed;
+    final value = rawUrl.contains('://') ? rawUrl : 'http://$rawUrl';
+    final uri = Uri.tryParse(value);
+    if (uri == null) {
+      return _defaultServerTapUrl;
     }
 
-    return Uri.base.scheme == 'https';
+    final host = uri.host.trim().isEmpty ? _defaultServerTapHost : uri.host;
+    final port = uri.hasPort ? uri.port.toString() : _defaultServerTapPort;
+    return 'http://$host:${_normalizeServerTapPort(port)}';
+  }
+
+  static String _normalizeServerTapPort(String port) {
+    final parsed = int.tryParse(port.trim());
+    if (parsed == null || parsed < 1 || parsed > 65535) {
+      return _defaultServerTapPort;
+    }
+    return parsed.toString();
+  }
+
+  static String composeServerTapUrl({
+    required String host,
+    required String port,
+  }) {
+    return _normalizeServerTapUrl(
+      '${host.trim().isEmpty ? _defaultServerTapHost : host.trim()}:'
+      '${_normalizeServerTapPort(port)}',
+    );
   }
 
   ApiService get _api => ApiService(backendUrl, idToken: _idToken);
   ServerTapService get _serverTap =>
       ServerTapService(baseUrl: serverTapUrl, key: serverTapKey);
+  String get serverTapHost => Uri.parse(serverTapUrl).host.isEmpty
+      ? _defaultServerTapHost
+      : Uri.parse(serverTapUrl).host;
+  String get serverTapPort => Uri.parse(serverTapUrl).hasPort
+      ? Uri.parse(serverTapUrl).port.toString()
+      : _defaultServerTapPort;
   String get overlayRulesUrl {
     final uri = Uri.parse(
       '${backendUrl.replaceAll(RegExp(r'/$'), '')}/overlay/rules',
+    );
+    return _withOverlayUser(uri).toString();
+  }
+
+  String get overlayAnnouncementsUrl {
+    final uri = Uri.parse(
+      '${backendUrl.replaceAll(RegExp(r'/$'), '')}/overlay/announcements',
     );
     return _withOverlayUser(uri).toString();
   }
@@ -125,6 +165,18 @@ class AppState extends ChangeNotifier {
     final host = uri.host == 'localhost' ? '127.0.0.1' : uri.host;
     return _withOverlayUser(
       uri.replace(host: host, path: '/overlay/rules'),
+    ).toString();
+  }
+
+  String get overlayAnnouncementsLiveStudioUrl {
+    final uri = Uri.tryParse(backendUrl);
+    if (uri == null) {
+      return overlayAnnouncementsUrl;
+    }
+
+    final host = uri.host == 'localhost' ? '127.0.0.1' : uri.host;
+    return _withOverlayUser(
+      uri.replace(host: host, path: '/overlay/announcements'),
     ).toString();
   }
 
@@ -142,10 +194,9 @@ class AppState extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     backendUrl = prefs.getString(_backendUrlKey) ?? backendUrl;
     tiktokUsername = prefs.getString(_tiktokUsernameKey) ?? tiktokUsername;
-    serverTapUrl = prefs.getString(_serverTapUrlKey) ?? serverTapUrl;
-    if (_isBlockedDefaultServerTapUrl(serverTapUrl)) {
-      serverTapUrl = '';
-    }
+    serverTapUrl = _normalizeServerTapUrl(
+      prefs.getString(_serverTapUrlKey) ?? serverTapUrl,
+    );
     serverTapKey = prefs.getString(_serverTapKeyKey) ?? serverTapKey;
     exarotonToken = prefs.getString(_exarotonTokenKey) ?? exarotonToken;
     exarotonServerId =
@@ -239,6 +290,17 @@ class AppState extends ChangeNotifier {
     await prefs.setString(_serverTapKeyKey, serverTapKey);
 
     notifyListeners();
+  }
+
+  Future<void> saveServerTapEndpoint({
+    required String host,
+    required String port,
+    required String key,
+  }) {
+    return saveServerTapConnection(
+      url: composeServerTapUrl(host: host, port: port),
+      key: key,
+    );
   }
 
   Future<void> saveExarotonConnection({
@@ -387,6 +449,13 @@ class AppState extends ChangeNotifier {
     await refresh(clearErrorOnSuccess: succeeded);
   }
 
+  Future<void> disconnectServerTap() async {
+    serverTapConnected = false;
+    serverTapServerName = '';
+    _clearError();
+    notifyListeners();
+  }
+
   Future<void> _autoConnectServerTap() async {
     if (serverTapUrl.isEmpty ||
         serverTapConnected ||
@@ -419,11 +488,13 @@ class AppState extends ChangeNotifier {
     if (!_canUseVerifiedAccount()) {
       return;
     }
+    final testCommand = _testCommandForRule(rule);
     final succeeded = await _runAction(() async {
       if (exarotonConnected) {
-        await _executeExarotonCommand(rule.command);
+        await _executeExarotonCommand(testCommand);
       } else {
-        await _executeServerTapCommand(rule.command);
+        await _executeServerTapCommand(testCommand);
+        await _api.sendRuleOverlayTest(ruleId: rule.id, command: testCommand);
       }
       await _speakRuleForTest(rule);
     });
@@ -507,7 +578,7 @@ class AppState extends ChangeNotifier {
       final session = await ApiService(
         backendUrl,
       ).login(email: email.trim(), password: password);
-      await _saveSession(session);
+      await _saveSessionAndReloadUser(session);
     });
     if (succeeded) {
       await refresh();
@@ -522,7 +593,7 @@ class AppState extends ChangeNotifier {
       final session = await ApiService(
         backendUrl,
       ).register(email: email.trim(), password: password);
-      await _saveSession(session);
+      await _saveSessionAndReloadUser(session);
     });
     if (succeeded) {
       await refresh();
@@ -646,15 +717,17 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  Future<void> _saveSessionAndReloadUser(AuthSession session) async {
+    await _saveSession(session);
+    await _refreshSession(force: true);
+  }
+
   String _normalizeTikTokUsername(String username) {
     return username.trim().replaceFirst('@', '');
   }
 
   void _setServerTapConnection(String url, String key) {
-    final nextUrl = url.trim();
-    if (nextUrl.isNotEmpty) {
-      serverTapUrl = nextUrl;
-    }
+    serverTapUrl = _normalizeServerTapUrl(url);
     serverTapKey = key.trim();
   }
 
@@ -779,11 +852,19 @@ class AppState extends ChangeNotifier {
       return;
     }
 
-    final message = rule.voiceMessage
+    final message = _testCommandText(rule.voiceMessage, rule);
+    await _voiceService.speak(message);
+  }
+
+  String _testCommandForRule(MinecraftRule rule) {
+    return _testCommandText(rule.command, rule);
+  }
+
+  String _testCommandText(String value, MinecraftRule rule) {
+    return value
         .replaceAll('{user}', 'test_user')
         .replaceAll('{username}', 'test_user')
         .replaceAll('{detail}', rule.trigger);
-    await _voiceService.speak(message);
   }
 
   bool _isTikTokRuleEvent(AppEvent event) {

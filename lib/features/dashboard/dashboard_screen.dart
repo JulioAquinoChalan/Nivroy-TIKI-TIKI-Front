@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
@@ -14,7 +15,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _minecraftConnectionTabController;
   late final TextEditingController _tiktokUsernameController;
-  late final TextEditingController _serverTapUrlController;
+  late final TextEditingController _serverTapHostController;
+  late final TextEditingController _serverTapPortController;
   late final TextEditingController _serverTapKeyController;
   late final TextEditingController _exarotonTokenController;
 
@@ -26,8 +28,11 @@ class _DashboardScreenState extends State<DashboardScreen>
     _tiktokUsernameController = TextEditingController(
       text: appState.tiktokUsername,
     );
-    _serverTapUrlController = TextEditingController(
-      text: appState.serverTapUrl,
+    _serverTapHostController = TextEditingController(
+      text: appState.serverTapHost,
+    );
+    _serverTapPortController = TextEditingController(
+      text: appState.serverTapPort,
     );
     _serverTapKeyController = TextEditingController(
       text: appState.serverTapKey,
@@ -41,7 +46,8 @@ class _DashboardScreenState extends State<DashboardScreen>
   void dispose() {
     _minecraftConnectionTabController.dispose();
     _tiktokUsernameController.dispose();
-    _serverTapUrlController.dispose();
+    _serverTapHostController.dispose();
+    _serverTapPortController.dispose();
     _serverTapKeyController.dispose();
     _exarotonTokenController.dispose();
     super.dispose();
@@ -54,10 +60,6 @@ class _DashboardScreenState extends State<DashboardScreen>
     if (_tiktokUsernameController.text.isEmpty &&
         appState.tiktokUsername.isNotEmpty) {
       _tiktokUsernameController.text = appState.tiktokUsername;
-    }
-    if (_serverTapUrlController.text.isEmpty &&
-        appState.serverTapUrl.isNotEmpty) {
-      _serverTapUrlController.text = appState.serverTapUrl;
     }
     if (_serverTapKeyController.text.isEmpty &&
         appState.serverTapKey.isNotEmpty) {
@@ -115,7 +117,8 @@ class _DashboardScreenState extends State<DashboardScreen>
           controller: _minecraftConnectionTabController,
           localConnection: _LocalConnectionCard(
             appState: appState,
-            serverTapUrlController: _serverTapUrlController,
+            serverTapHostController: _serverTapHostController,
+            serverTapPortController: _serverTapPortController,
             serverTapKeyController: _serverTapKeyController,
           ),
           exarotonConnection: _ExarotonConnectionCard(
@@ -339,13 +342,23 @@ class _MinecraftConnectionTabsState extends State<_MinecraftConnectionTabs> {
 class _LocalConnectionCard extends StatelessWidget {
   const _LocalConnectionCard({
     required this.appState,
-    required this.serverTapUrlController,
+    required this.serverTapHostController,
+    required this.serverTapPortController,
     required this.serverTapKeyController,
   });
 
   final AppState appState;
-  final TextEditingController serverTapUrlController;
+  final TextEditingController serverTapHostController;
+  final TextEditingController serverTapPortController;
   final TextEditingController serverTapKeyController;
+
+  void _saveConnection() {
+    appState.saveServerTapEndpoint(
+      host: serverTapHostController.text,
+      port: serverTapPortController.text,
+      key: serverTapKeyController.text,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -367,18 +380,32 @@ class _LocalConnectionCard extends StatelessWidget {
             SizedBox(
               width: 300,
               child: TextField(
-                controller: serverTapUrlController,
+                controller: serverTapHostController,
                 textInputAction: TextInputAction.next,
+                keyboardType: TextInputType.url,
                 decoration: const InputDecoration(
-                  labelText: 'URL ServerTap local',
-                  hintText: 'http://127.0.0.1:4567',
+                  labelText: 'IP ServerTap local',
+                  hintText: '127.0.0.1',
                   prefixIcon: Icon(Icons.router),
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (value) => appState.saveServerTapConnection(
-                  url: value,
-                  key: serverTapKeyController.text,
+                onChanged: (_) => _saveConnection(),
+              ),
+            ),
+            SizedBox(
+              width: 140,
+              child: TextField(
+                controller: serverTapPortController,
+                textInputAction: TextInputAction.next,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  labelText: 'Puerto',
+                  hintText: '4567',
+                  prefixIcon: Icon(Icons.numbers),
+                  border: OutlineInputBorder(),
                 ),
+                onChanged: (_) => _saveConnection(),
               ),
             ),
             SizedBox(
@@ -392,10 +419,7 @@ class _LocalConnectionCard extends StatelessWidget {
                   prefixIcon: Icon(Icons.key),
                   border: OutlineInputBorder(),
                 ),
-                onChanged: (value) => appState.saveServerTapConnection(
-                  url: serverTapUrlController.text,
-                  key: value,
-                ),
+                onChanged: (_) => _saveConnection(),
               ),
             ),
           ],
@@ -411,9 +435,11 @@ class _LocalConnectionCard extends StatelessWidget {
               label: const Text('Conectar local'),
             ),
             OutlinedButton.icon(
-              onPressed: appState.isBusy ? null : appState.testServerTapCommand,
-              icon: const Icon(Icons.terminal),
-              label: const Text('Probar comando'),
+              onPressed: appState.serverTapConnected && !appState.isBusy
+                  ? appState.disconnectServerTap
+                  : null,
+              icon: const Icon(Icons.link_off),
+              label: const Text('Desconectar'),
             ),
           ],
         ),
@@ -450,8 +476,6 @@ class _ExarotonConnectionCard extends StatelessWidget {
           badgeIcon: Icons.cloud_queue,
           active: appState.exarotonConnected,
         ),
-        const SizedBox(height: 16),
-        const _ExarotonInstructions(),
         const SizedBox(height: 16),
         Wrap(
           spacing: 12,
@@ -548,85 +572,6 @@ class _ExarotonConnectionCard extends StatelessWidget {
           ],
         ),
       ],
-    );
-  }
-}
-
-class _ExarotonInstructions extends StatelessWidget {
-  const _ExarotonInstructions();
-
-  static const _steps = [
-    'Crea tu servidor de Minecraft en Exaroton.',
-    'Cambia el software del servidor a Paper/Bukkit.',
-    'En el apartado de plugins, busca ServerTap e instalalo.',
-    'Obtén tu token API desde Cuenta > Ajustes. Si no tienes uno, genera un token nuevo.',
-    'Pega tu token API aqui y carga tus servidores.',
-    'Selecciona tu servidor y conectalo a Exaroton.',
-    'Crea tus reglas para empezar a reaccionar con los usuarios :D',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.36),
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.tips_and_updates_outlined, color: colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                'Guia rapida para Exaroton',
-                style: textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          for (var index = 0; index < _steps.length; index++) ...[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '${index + 1}',
-                    style: textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 2),
-                    child: Text(_steps[index]),
-                  ),
-                ),
-              ],
-            ),
-            if (index < _steps.length - 1) const SizedBox(height: 8),
-          ],
-        ],
-      ),
     );
   }
 }

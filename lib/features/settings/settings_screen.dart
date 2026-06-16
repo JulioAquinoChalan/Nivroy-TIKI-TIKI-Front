@@ -5,39 +5,8 @@ import 'package:provider/provider.dart';
 import '../../core/app_state.dart';
 import '../../models/minecraft_rule.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
-
-  @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
-}
-
-class _SettingsScreenState extends State<SettingsScreen> {
-  late final TextEditingController _backendUrlController;
-  late final TextEditingController _tiktokUsernameController;
-  late final TextEditingController _serverTapUrlController;
-  late final TextEditingController _serverTapKeyController;
-
-  @override
-  void initState() {
-    super.initState();
-    final appState = context.read<AppState>();
-    _backendUrlController = TextEditingController(text: appState.backendUrl);
-    _tiktokUsernameController = TextEditingController(
-      text: appState.tiktokUsername,
-    );
-    _serverTapUrlController = TextEditingController(text: appState.serverTapUrl);
-    _serverTapKeyController = TextEditingController(text: appState.serverTapKey);
-  }
-
-  @override
-  void dispose() {
-    _backendUrlController.dispose();
-    _tiktokUsernameController.dispose();
-    _serverTapUrlController.dispose();
-    _serverTapKeyController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,69 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _backendUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'URL del backend',
-                    prefixIcon: Icon(Icons.http),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _tiktokUsernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Usuario TikTok',
-                    prefixIcon: Icon(Icons.alternate_email),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _serverTapUrlController,
-                  decoration: const InputDecoration(
-                    labelText: 'URL ServerTap',
-                    hintText: 'http://127.0.0.1:4567',
-                    prefixIcon: Icon(Icons.router),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _serverTapKeyController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'API key ServerTap',
-                    prefixIcon: Icon(Icons.key),
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: appState.isBusy
-                        ? null
-                        : () => appState.saveSettings(
-                            newBackendUrl: _backendUrlController.text,
-                            newTikTokUsername: _tiktokUsernameController.text,
-                            newServerTapUrl: _serverTapUrlController.text,
-                            newServerTapKey: _serverTapKeyController.text,
-                          ),
-                    icon: const Icon(Icons.save),
-                    label: const Text('Guardar'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
         _OverlaySettingsCard(appState: appState),
       ],
     );
@@ -149,6 +55,9 @@ class _OverlaySettingsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final liveStudioUrl = appState.overlayLiveStudioUrl;
     final browserUrl = appState.overlayRulesUrl;
+    final announcementsLiveStudioUrl =
+        appState.overlayAnnouncementsLiveStudioUrl;
+    final announcementsBrowserUrl = appState.overlayAnnouncementsUrl;
 
     return Card(
       child: Padding(
@@ -165,7 +74,7 @@ class _OverlaySettingsCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Copiar URL para Live Studio',
+                  tooltip: 'Copiar URL de comandos',
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: liveStudioUrl));
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -197,6 +106,50 @@ class _OverlaySettingsCard extends StatelessWidget {
               const SizedBox(height: 6),
               SelectableText(
                 browserUrl,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.secondary,
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'URL para anuncios de 3 segundos',
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Copiar URL de anuncios',
+                  onPressed: () {
+                    Clipboard.setData(
+                      ClipboardData(text: announcementsLiveStudioUrl),
+                    );
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('URL copiada')),
+                    );
+                  },
+                  icon: const Icon(Icons.copy),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            SelectableText(
+              announcementsLiveStudioUrl,
+              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+            if (announcementsBrowserUrl != announcementsLiveStudioUrl) ...[
+              const SizedBox(height: 10),
+              Text(
+                'URL alternativa para navegador',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              SelectableText(
+                announcementsBrowserUrl,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context).colorScheme.secondary,
                 ),

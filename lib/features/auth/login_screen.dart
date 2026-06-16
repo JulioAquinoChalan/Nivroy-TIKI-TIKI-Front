@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -144,43 +142,13 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-class _VerifyEmailView extends StatefulWidget {
+class _VerifyEmailView extends StatelessWidget {
   const _VerifyEmailView({required this.appState});
 
   final AppState appState;
 
   @override
-  State<_VerifyEmailView> createState() => _VerifyEmailViewState();
-}
-
-class _VerifyEmailViewState extends State<_VerifyEmailView> {
-  Timer? _verificationTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _verificationTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted ||
-          widget.appState.isBusy ||
-          !widget.appState.isAuthenticated ||
-          widget.appState.isEmailVerified) {
-        return;
-      }
-
-      widget.appState.reloadAuthUser();
-    });
-  }
-
-  @override
-  void dispose() {
-    _verificationTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final appState = widget.appState;
-
     return Scaffold(
       body: SafeArea(
         child: Center(

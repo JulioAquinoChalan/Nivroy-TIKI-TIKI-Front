@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+import '../models/api_response.dart';
 import '../models/app_event.dart';
 import '../models/exaroton_server.dart';
 import '../models/health_status.dart';
@@ -59,16 +60,8 @@ class ApiService {
 
   Future<AuthSession> getCurrentUser() async {
     final response = await http.get(_uri('/auth/me'), headers: _authHeaders);
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
-
-    if (response.statusCode >= 400) {
-      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
-      throw Exception(message ?? 'Backend returned ${response.statusCode}');
-    }
-
-    return AuthSession.fromJson(decoded as Map<String, dynamic>);
+    final data = _readMapData(response);
+    return AuthSession.fromJson(data);
   }
 
   Future<void> sendEmailVerification() async {
@@ -77,22 +70,21 @@ class ApiService {
 
   Future<HealthStatus> getHealth() async {
     final response = await http.get(_uri('/health'));
-    if (response.statusCode >= 400) {
-      throw Exception('Backend returned ${response.statusCode}');
+    final apiResponse = _readApiResponse(response);
+    final data = apiResponse.data;
+    if (data is Map<String, dynamic>) {
+      return HealthStatus.fromJson(data, backendOnline: apiResponse.success);
     }
 
     return HealthStatus.fromJson(
-      jsonDecode(response.body) as Map<String, dynamic>,
+      const <String, dynamic>{},
+      backendOnline: apiResponse.success,
     );
   }
 
   Future<List<AppEvent>> getEvents() async {
     final response = await http.get(_uri('/events'));
-    if (response.statusCode >= 400) {
-      throw Exception('Backend returned ${response.statusCode}');
-    }
-
-    final data = jsonDecode(response.body) as List<dynamic>;
+    final data = _readListData(response);
     return data
         .map((item) => AppEvent.fromJson(item as Map<String, dynamic>))
         .toList();
@@ -100,11 +92,7 @@ class ApiService {
 
   Future<List<MinecraftRule>> getRules() async {
     final response = await http.get(_uri('/rules'), headers: _authHeaders);
-    if (response.statusCode >= 400) {
-      throw Exception('Backend returned ${response.statusCode}');
-    }
-
-    final data = jsonDecode(response.body) as List<dynamic>;
+    final data = _readListData(response);
     return data
         .map((item) => MinecraftRule.fromJson(item as Map<String, dynamic>))
         .toList();
@@ -168,9 +156,7 @@ class ApiService {
       _uri('/rules/$id'),
       headers: _authHeaders,
     );
-    if (response.statusCode >= 400) {
-      throw Exception('Backend returned ${response.statusCode}');
-    }
+    _readApiResponse(response);
   }
 
   Future<void> connectTikTok(String username) async {
@@ -191,18 +177,8 @@ class ApiService {
         if (token.trim().isNotEmpty) 'x-exaroton-token': token.trim(),
       },
     );
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
-
-    if (response.statusCode >= 400) {
-      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
-      throw Exception(message ?? 'Backend returned ${response.statusCode}');
-    }
-
-    final data = decoded is Map<String, dynamic>
-        ? decoded['servers'] as List<dynamic>? ?? const []
-        : const [];
+    final data =
+        _readMapData(response)['servers'] as List<dynamic>? ?? const [];
     return data
         .map((item) => ExarotonServer.fromJson(item as Map<String, dynamic>))
         .where((server) => server.id.isNotEmpty)
@@ -244,16 +220,7 @@ class ApiService {
           : {'Content-Type': 'application/json'},
       body: jsonEncode(body),
     );
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
-
-    if (response.statusCode >= 400) {
-      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
-      throw Exception(message ?? 'Backend returned ${response.statusCode}');
-    }
-
-    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    return _readMapData(response);
   }
 
   Future<Map<String, dynamic>> _put(
@@ -265,16 +232,7 @@ class ApiService {
       headers: _jsonHeaders,
       body: jsonEncode(body),
     );
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
-
-    if (response.statusCode >= 400) {
-      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
-      throw Exception(message ?? 'Backend returned ${response.statusCode}');
-    }
-
-    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    return _readMapData(response);
   }
 
   Future<Map<String, dynamic>> _patch(
@@ -286,16 +244,97 @@ class ApiService {
       headers: _jsonHeaders,
       body: jsonEncode(body),
     );
-    final decoded = response.body.isEmpty
-        ? <String, dynamic>{}
-        : jsonDecode(response.body);
+    return _readMapData(response);
+  }
 
-    if (response.statusCode >= 400) {
-      final message = decoded is Map<String, dynamic> ? decoded['error'] : null;
-      throw Exception(message ?? 'Backend returned ${response.statusCode}');
+  ApiResponse<Object?> _readApiResponse(http.Response response) {
+    final decoded = _decodeBody(response);
+    final apiResponse = _normalizeApiResponse(decoded, response.statusCode);
+
+    if (response.statusCode >= 400 || !apiResponse.success) {
+      throw Exception(apiResponse.fallbackErrorMessage(response.statusCode));
     }
 
-    return decoded is Map<String, dynamic> ? decoded : <String, dynamic>{};
+    return apiResponse;
+  }
+
+  Map<String, dynamic> _readMapData(http.Response response) {
+    final data = _readApiResponse(response).data;
+    return data is Map<String, dynamic> ? data : <String, dynamic>{};
+  }
+
+  List<dynamic> _readListData(http.Response response) {
+    final data = _readApiResponse(response).data;
+    return data is List<dynamic> ? data : const [];
+  }
+
+  Object? _decodeBody(http.Response response) {
+    if (response.body.isEmpty) {
+      return <String, dynamic>{};
+    }
+
+    try {
+      return jsonDecode(response.body);
+    } on FormatException {
+      throw Exception('Backend returned invalid JSON (${response.statusCode})');
+    }
+  }
+
+  ApiResponse<Object?> _normalizeApiResponse(Object? decoded, int statusCode) {
+    if (decoded is Map<String, dynamic>) {
+      if (decoded.containsKey('success')) {
+        return ApiResponse<Object?>.fromJson(decoded, (value) => value);
+      }
+
+      return _legacyMapResponse(decoded, statusCode);
+    }
+
+    if (decoded is List<dynamic>) {
+      return ApiResponse<Object?>(
+        success: statusCode < 400,
+        message: '',
+        data: decoded,
+        error: null,
+        meta: null,
+        timestamp: '',
+      );
+    }
+
+    return ApiResponse<Object?>(
+      success: statusCode < 400,
+      message: '',
+      data: decoded,
+      error: null,
+      meta: null,
+      timestamp: '',
+    );
+  }
+
+  ApiResponse<Object?> _legacyMapResponse(
+    Map<String, dynamic> decoded,
+    int statusCode,
+  ) {
+    final hasLegacyOk = decoded.containsKey('ok');
+    final success = hasLegacyOk ? decoded['ok'] == true : statusCode < 400;
+    final error = decoded['error'];
+    final message =
+        decoded['message']?.toString() ??
+        (success ? '' : error?.toString() ?? '');
+    final data = Map<String, dynamic>.from(decoded)
+      ..remove('ok')
+      ..remove('error')
+      ..remove('message');
+
+    return ApiResponse<Object?>(
+      success: success,
+      message: message,
+      data: success ? data : null,
+      error: success
+          ? null
+          : ApiError(code: statusCode, detail: error?.toString() ?? message),
+      meta: null,
+      timestamp: '',
+    );
   }
 }
 

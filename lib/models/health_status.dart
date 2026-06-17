@@ -26,14 +26,18 @@ class HealthStatus {
     );
   }
 
-  factory HealthStatus.fromJson(Map<String, dynamic> json) {
+  factory HealthStatus.fromJson(
+    Map<String, dynamic> json, {
+    required bool backendOnline,
+  }) {
     return HealthStatus(
-      backendOnline: json['ok'] == true,
+      backendOnline: backendOnline,
       tiktokConnected: json['tiktokConnected'] == true,
       minecraftConnected: json['minecraftConnected'] == true,
       currentTikTokUser: json['currentTikTokUser']?.toString() ?? '',
       minecraftHost: json['minecraftHost']?.toString() ?? '127.0.0.1',
-      minecraftPort: int.tryParse(json['minecraftPort']?.toString() ?? '') ?? 25575,
+      minecraftPort:
+          int.tryParse(json['minecraftPort']?.toString() ?? '') ?? 25575,
     );
   }
 }

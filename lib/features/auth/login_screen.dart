@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     if (appState.isAuthenticated && !appState.isEmailVerified) {
       return _VerifyEmailView(appState: appState);
@@ -46,7 +48,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        _isRegistering ? 'Crear cuenta' : 'Iniciar sesion',
+                        _isRegistering
+                            ? l10n.t('auth.createAccount')
+                            : l10n.t('auth.signIn'),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 18),
@@ -54,10 +58,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Correo electronico',
-                          prefixIcon: Icon(Icons.email_outlined),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('auth.email'),
+                          prefixIcon: const Icon(Icons.email_outlined),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -66,13 +70,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         obscureText: _obscurePassword,
                         autofillHints: const [AutofillHints.password],
                         decoration: InputDecoration(
-                          labelText: 'Contrasena',
+                          labelText: l10n.t('auth.password'),
                           prefixIcon: const Icon(Icons.lock_outline),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             tooltip: _obscurePassword
-                                ? 'Mostrar contrasena'
-                                : 'Ocultar contrasena',
+                                ? l10n.t('auth.showPassword')
+                                : l10n.t('auth.hidePassword'),
                             onPressed: () => setState(
                               () => _obscurePassword = !_obscurePassword,
                             ),
@@ -90,7 +94,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         icon: Icon(
                           _isRegistering ? Icons.person_add_alt : Icons.login,
                         ),
-                        label: Text(_isRegistering ? 'Registrarme' : 'Entrar'),
+                        label: Text(
+                          _isRegistering
+                              ? l10n.t('auth.register')
+                              : l10n.t('auth.enter'),
+                        ),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
@@ -101,8 +109,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                         child: Text(
                           _isRegistering
-                              ? 'Ya tengo cuenta'
-                              : 'Crear una cuenta',
+                              ? l10n.t('auth.haveAccount')
+                              : l10n.t('auth.createAccountAction'),
                         ),
                       ),
                       if (appState.lastError != null) ...[
@@ -149,6 +157,8 @@ class _VerifyEmailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -164,12 +174,14 @@ class _VerifyEmailView extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Verifica tu correo',
+                        l10n.t('auth.verifyEmailTitle'),
                         style: Theme.of(context).textTheme.headlineSmall,
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Enviamos un enlace a ${appState.authEmail}. Verifica tu correo para cargar tus rules de Firestore.',
+                        l10n.t('auth.verifyEmailMessage', {
+                          'email': appState.authEmail,
+                        }),
                       ),
                       const SizedBox(height: 18),
                       FilledButton.icon(
@@ -177,7 +189,7 @@ class _VerifyEmailView extends StatelessWidget {
                             ? null
                             : appState.reloadAuthUser,
                         icon: const Icon(Icons.refresh),
-                        label: const Text('Ya verifique mi correo'),
+                        label: Text(l10n.t('auth.alreadyVerified')),
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
@@ -185,12 +197,12 @@ class _VerifyEmailView extends StatelessWidget {
                             ? null
                             : appState.sendEmailVerification,
                         icon: const Icon(Icons.mark_email_unread_outlined),
-                        label: const Text('Reenviar verificacion'),
+                        label: Text(l10n.t('auth.resendVerification')),
                       ),
                       TextButton.icon(
                         onPressed: appState.isBusy ? null : appState.logout,
                         icon: const Icon(Icons.logout),
-                        label: const Text('Cerrar sesion'),
+                        label: Text(l10n.t('common.logout')),
                       ),
                       if (appState.lastError != null) ...[
                         const SizedBox(height: 12),

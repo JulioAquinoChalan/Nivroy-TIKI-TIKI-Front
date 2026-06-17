@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/minecraft_rule.dart';
+import '../../models/overlay_item.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -11,29 +13,78 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Settings', style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          l10n.t('settings.title'),
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
         const SizedBox(height: 16),
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
               children: [
-                const Icon(Icons.account_circle_outlined),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    appState.authEmail,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                Row(
+                  children: [
+                    const Icon(Icons.account_circle_outlined),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        appState.authEmail,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: appState.isBusy ? null : appState.logout,
+                      icon: const Icon(Icons.logout),
+                      label: Text(l10n.t('common.logout')),
+                    ),
+                  ],
                 ),
-                TextButton.icon(
-                  onPressed: appState.isBusy ? null : appState.logout,
-                  icon: const Icon(Icons.logout),
-                  label: const Text('Salir'),
+                const Divider(height: 24),
+                Row(
+                  children: [
+                    const Icon(Icons.language),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        l10n.t('settings.language'),
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                    ),
+                    SizedBox(
+                      width: 180,
+                      child: DropdownButtonFormField<String>(
+                        initialValue: appState.languageCode,
+                        decoration: InputDecoration(
+                          labelText: l10n.t('settings.languageField'),
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
+                        items: [
+                          DropdownMenuItem(
+                            value: 'es',
+                            child: Text(l10n.t('settings.languageSpanish')),
+                          ),
+                          DropdownMenuItem(
+                            value: 'en',
+                            child: Text(l10n.t('settings.languageEnglish')),
+                          ),
+                        ],
+                        onChanged: appState.isBusy
+                            ? null
+                            : (value) {
+                                if (value != null) {
+                                  appState.setLanguageCode(value);
+                                }
+                              },
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -46,18 +97,43 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class _OverlaySettingsCard extends StatelessWidget {
+class _OverlaySettingsCard extends StatefulWidget {
   const _OverlaySettingsCard({required this.appState});
 
   final AppState appState;
 
   @override
+  State<_OverlaySettingsCard> createState() => _OverlaySettingsCardState();
+}
+
+class _OverlaySettingsCardState extends State<_OverlaySettingsCard> {
+  OverlayPreviewKind? _visiblePreview;
+
+  void _togglePreview(OverlayPreviewKind preview) {
+    setState(() {
+      _visiblePreview = _visiblePreview == preview ? null : preview;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final liveStudioUrl = appState.overlayLiveStudioUrl;
-    final browserUrl = appState.overlayRulesUrl;
-    final announcementsLiveStudioUrl =
-        appState.overlayAnnouncementsLiveStudioUrl;
-    final announcementsBrowserUrl = appState.overlayAnnouncementsUrl;
+    final appState = widget.appState;
+    final l10n = context.l10n;
+    final overlays = [
+      OverlayItem(
+        title: l10n.t('settings.overlayAnnouncementsUrl'),
+        url: appState.overlayAnnouncementsLiveStudioUrl,
+        browserUrl: appState.overlayAnnouncementsUrl,
+        copyTooltip: l10n.t('settings.copyAnnouncementsUrl'),
+      ),
+      OverlayItem(
+        title: l10n.t('settings.overlayGiftsUrl'),
+        url: appState.overlayLiveStudioUrl,
+        browserUrl: appState.overlayRulesUrl,
+        copyTooltip: l10n.t('settings.copyGiftsUrl'),
+        preview: OverlayPreviewKind.gifts,
+      ),
+    ];
 
     return Card(
       child: Padding(
@@ -69,97 +145,109 @@ class _OverlaySettingsCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Overlay Live Studio',
+                    l10n.t('settings.overlayLiveStudio'),
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
-                ),
-                IconButton(
-                  tooltip: 'Copiar URL de comandos',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: liveStudioUrl));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('URL copiada')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              'URL recomendada para TikTok Live Studio',
-              style: Theme.of(context).textTheme.labelLarge,
+            _OverlayUrlSection(
+              overlay: overlays[0],
+              previewVisible: false,
+              onTogglePreview: _togglePreview,
             ),
-            const SizedBox(height: 6),
-            SelectableText(
-              liveStudioUrl,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
+            const SizedBox(height: 18),
+            _OverlayUrlSection(
+              overlay: overlays[1],
+              previewVisible: _visiblePreview == overlays[1].preview,
+              onTogglePreview: _togglePreview,
+              preview: _OverlayPreview(rules: appState.rules),
             ),
-            if (browserUrl != liveStudioUrl) ...[
-              const SizedBox(height: 10),
-              Text(
-                'URL alternativa para navegador',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 6),
-              SelectableText(
-                browserUrl,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'URL para anuncios de 3 segundos',
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Copiar URL de anuncios',
-                  onPressed: () {
-                    Clipboard.setData(
-                      ClipboardData(text: announcementsLiveStudioUrl),
-                    );
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('URL copiada')),
-                    );
-                  },
-                  icon: const Icon(Icons.copy),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            SelectableText(
-              announcementsLiveStudioUrl,
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            if (announcementsBrowserUrl != announcementsLiveStudioUrl) ...[
-              const SizedBox(height: 10),
-              Text(
-                'URL alternativa para navegador',
-                style: Theme.of(context).textTheme.labelLarge,
-              ),
-              const SizedBox(height: 6),
-              SelectableText(
-                announcementsBrowserUrl,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.secondary,
-                ),
-              ),
-            ],
-            const SizedBox(height: 16),
-            _OverlayPreview(rules: appState.rules),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _OverlayUrlSection extends StatelessWidget {
+  const _OverlayUrlSection({
+    required this.overlay,
+    required this.previewVisible,
+    required this.onTogglePreview,
+    this.preview,
+  });
+
+  final OverlayItem overlay;
+  final bool previewVisible;
+  final ValueChanged<OverlayPreviewKind> onTogglePreview;
+  final Widget? preview;
+
+  @override
+  Widget build(BuildContext context) {
+    final browserUrl = overlay.browserUrl;
+    final l10n = context.l10n;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                overlay.title,
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+            ),
+            if (overlay.preview != null)
+              IconButton(
+                tooltip: previewVisible
+                    ? l10n.t('settings.hidePreview')
+                    : l10n.t('settings.showPreview'),
+                onPressed: () => onTogglePreview(overlay.preview!),
+                icon: Icon(
+                  previewVisible ? Icons.visibility_off : Icons.visibility,
+                ),
+              ),
+            IconButton(
+              tooltip: overlay.copyTooltip,
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: overlay.url));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(l10n.t('settings.urlCopied'))),
+                );
+              },
+              icon: const Icon(Icons.copy),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        SelectableText(
+          overlay.url,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        if (browserUrl != null && browserUrl != overlay.url) ...[
+          const SizedBox(height: 10),
+          Text(
+            l10n.t('settings.browserAlternativeUrl'),
+            style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: 6),
+          SelectableText(
+            browserUrl,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+          ),
+        ],
+        if (previewVisible && preview != null) ...[
+          const SizedBox(height: 12),
+          preview!,
+        ],
+      ],
     );
   }
 }
@@ -172,6 +260,7 @@ class _OverlayPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final previewRules = rules.where((rule) => rule.enabled).take(6).toList();
+    final l10n = context.l10n;
 
     return Container(
       width: double.infinity,
@@ -195,7 +284,7 @@ class _OverlayPreview extends StatelessWidget {
                 ),
               ),
               Text(
-                'Vista previa',
+                l10n.t('settings.preview'),
                 style: Theme.of(context).textTheme.labelMedium?.copyWith(
                   color: const Color(0xFFB8C7C3),
                 ),
@@ -204,7 +293,7 @@ class _OverlayPreview extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           if (previewRules.isEmpty)
-            const Text('No hay comandos activos.')
+            Text(l10n.t('settings.noActiveCommands'))
           else
             Column(
               children: [
@@ -227,6 +316,8 @@ class _OverlayRuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Container(
       width: double.infinity,
       constraints: const BoxConstraints(minHeight: 82),
@@ -271,7 +362,7 @@ class _OverlayRuleTile extends StatelessWidget {
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(
-                    _eventTypeLabel(rule.eventType),
+                    _eventTypeLabel(rule.eventType, l10n),
                     style: const TextStyle(
                       color: Color(0xFF8BE8D3),
                       fontSize: 11,
@@ -281,7 +372,7 @@ class _OverlayRuleTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  _instruction(rule),
+                  _instruction(rule, l10n),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontWeight: FontWeight.w800),
@@ -305,25 +396,27 @@ class _OverlayRuleTile extends StatelessWidget {
     );
   }
 
-  String _instruction(MinecraftRule rule) {
+  String _instruction(MinecraftRule rule, AppLocalizations l10n) {
     return switch (rule.eventType) {
-      'chat' => 'Escribe ${rule.trigger}',
-      'like' => 'Toca like',
-      'follow' => 'Sigue el live',
-      'member' => 'Entra al live',
-      'share' => 'Comparte el live',
-      _ => 'Envia ${rule.trigger}',
+      'chat' => l10n.t('settings.previewInstructionChat', {
+        'trigger': rule.trigger,
+      }),
+      'like' => l10n.t('settings.previewInstructionLike'),
+      'follow' => l10n.t('settings.previewInstructionFollow'),
+      'member' => l10n.t('settings.previewInstructionMember'),
+      'share' => l10n.t('settings.previewInstructionShare'),
+      _ => l10n.t('settings.previewInstructionGift', {'trigger': rule.trigger}),
     };
   }
 
-  String _eventTypeLabel(String eventType) {
+  String _eventTypeLabel(String eventType, AppLocalizations l10n) {
     return switch (eventType) {
-      'gift' => 'Regalo',
-      'like' => 'Like',
-      'follow' => 'Follow',
-      'member' => 'Entrada',
-      'share' => 'Share',
-      'chat' => 'Chat',
+      'gift' => l10n.t('event.gift'),
+      'like' => l10n.t('event.like'),
+      'follow' => l10n.t('event.follow'),
+      'member' => l10n.t('event.member'),
+      'share' => l10n.t('event.share'),
+      'chat' => l10n.t('event.chat'),
       _ => eventType,
     };
   }

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_localizations.dart';
+
 class TutorialScreen extends StatefulWidget {
   const TutorialScreen({super.key});
 
@@ -37,11 +39,15 @@ class _TutorialScreenState extends State<TutorialScreen>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final tutorial = _tutorials[_selectedIndex];
+    final l10n = context.l10n;
 
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Tutorial', style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          l10n.t('tutorial.title'),
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
         const SizedBox(height: 16),
         Card(
           child: Column(
@@ -70,7 +76,7 @@ class _TutorialScreenState extends State<TutorialScreen>
                           children: [
                             Icon(item.icon),
                             const SizedBox(width: 8),
-                            Text(item.tabLabel),
+                            Text(l10n.t(item.tabLabelKey)),
                           ],
                         ),
                       ),
@@ -82,7 +88,7 @@ class _TutorialScreenState extends State<TutorialScreen>
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 180),
                   child: _TutorialGuideCard(
-                    key: ValueKey(tutorial.tabLabel),
+                    key: ValueKey(tutorial.tabLabelKey),
                     tutorial: tutorial,
                   ),
                 ),
@@ -122,7 +128,7 @@ class _TutorialGuideCard extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  tutorial.title,
+                  context.l10n.t(tutorial.titleKey),
                   style: textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -131,7 +137,7 @@ class _TutorialGuideCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          for (var index = 0; index < tutorial.steps.length; index++) ...[
+          for (var index = 0; index < tutorial.stepKeys.length; index++) ...[
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -155,12 +161,12 @@ class _TutorialGuideCard extends StatelessWidget {
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.only(top: 2),
-                    child: Text(tutorial.steps[index]),
+                    child: Text(context.l10n.t(tutorial.stepKeys[index])),
                   ),
                 ),
               ],
             ),
-            if (index < tutorial.steps.length - 1) const SizedBox(height: 8),
+            if (index < tutorial.stepKeys.length - 1) const SizedBox(height: 8),
           ],
         ],
       ),
@@ -170,56 +176,56 @@ class _TutorialGuideCard extends StatelessWidget {
 
 class _TutorialContent {
   const _TutorialContent({
-    required this.tabLabel,
-    required this.title,
+    required this.tabLabelKey,
+    required this.titleKey,
     required this.icon,
-    required this.steps,
+    required this.stepKeys,
   });
 
-  final String tabLabel;
-  final String title;
+  final String tabLabelKey;
+  final String titleKey;
   final IconData icon;
-  final List<String> steps;
+  final List<String> stepKeys;
 }
 
 const _tutorials = [
   _TutorialContent(
-    tabLabel: 'TikTok',
-    title: 'Guia rapida para conectar TikTok Live',
+    tabLabelKey: 'tutorial.tiktokTab',
+    titleKey: 'tutorial.tiktokTitle',
     icon: Icons.live_tv,
-    steps: [
-      'Abre el Dashboard y ubica la tarjeta Conexion TikTok Live.',
-      'Escribe tu usuario de TikTok sin arroba.',
-      'Presiona Conectar TikTok.',
-      'Inicia o mantén activo tu Live de TikTok.',
-      'Verifica que el estado cambie a Conectado antes de crear reglas.',
+    stepKeys: [
+      'tutorial.tiktokStep1',
+      'tutorial.tiktokStep2',
+      'tutorial.tiktokStep3',
+      'tutorial.tiktokStep4',
+      'tutorial.tiktokStep5',
     ],
   ),
   _TutorialContent(
-    tabLabel: 'Minecraft local',
-    title: 'Guia rapida para conectar Minecraft local',
+    tabLabelKey: 'tutorial.localTab',
+    titleKey: 'tutorial.localTitle',
     icon: Icons.computer,
-    steps: [
-      'Instala Paper/Bukkit en tu servidor local de Minecraft.',
-      'Instala el plugin ServerTap en la carpeta plugins del servidor.',
-      'Inicia o reinicia el servidor para que ServerTap genere su configuracion.',
-      'Copia la API key de ServerTap y confirma el puerto configurado.',
-      'En el Dashboard, pega la IP local, el puerto y la API key.',
-      'Presiona Conectar local y verifica que Minecraft quede conectado.',
+    stepKeys: [
+      'tutorial.localStep1',
+      'tutorial.localStep2',
+      'tutorial.localStep3',
+      'tutorial.localStep4',
+      'tutorial.localStep5',
+      'tutorial.localStep6',
     ],
   ),
   _TutorialContent(
-    tabLabel: 'Minecraft Exaroton',
-    title: 'Guia rapida para Exaroton',
+    tabLabelKey: 'tutorial.exarotonTab',
+    titleKey: 'tutorial.exarotonTitle',
     icon: Icons.cloud_outlined,
-    steps: [
-      'Crea tu servidor de Minecraft en Exaroton.',
-      'Cambia el software del servidor a Paper/Bukkit.',
-      'En el apartado de plugins, busca ServerTap e instalalo.',
-      'Obtén tu token API desde Cuenta > Ajustes. Si no tienes uno, genera un token nuevo.',
-      'Pega tu token API en el Dashboard y carga tus servidores.',
-      'Selecciona tu servidor y conectalo a Exaroton.',
-      'Crea tus reglas para empezar a reaccionar con los usuarios :D',
+    stepKeys: [
+      'tutorial.exarotonStep1',
+      'tutorial.exarotonStep2',
+      'tutorial.exarotonStep3',
+      'tutorial.exarotonStep4',
+      'tutorial.exarotonStep5',
+      'tutorial.exarotonStep6',
+      'tutorial.exarotonStep7',
     ],
   ),
 ];

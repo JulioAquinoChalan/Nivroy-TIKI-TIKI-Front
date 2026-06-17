@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/minecraft_rule.dart';
 
 class RulesScreen extends StatelessWidget {
@@ -10,6 +11,7 @@ class RulesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     return Scaffold(
       body: ListView(
@@ -19,7 +21,7 @@ class RulesScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  'Rules',
+                  l10n.t('rules.title'),
                   style: Theme.of(context).textTheme.headlineMedium,
                 ),
               ),
@@ -28,16 +30,16 @@ class RulesScreen extends StatelessWidget {
                     ? null
                     : () => _showRuleDialog(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Crear comando'),
+                label: Text(l10n.t('rules.createCommand')),
               ),
             ],
           ),
           const SizedBox(height: 16),
           if (appState.rules.isEmpty)
-            const Card(
+            Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('No hay reglas configuradas'),
+                padding: const EdgeInsets.all(16),
+                child: Text(l10n.t('rules.empty')),
               ),
             )
           else
@@ -64,6 +66,7 @@ class RulesScreen extends StatelessWidget {
     BuildContext context, {
     MinecraftRule? rule,
   }) async {
+    final l10n = context.l10n;
     final isEditing = rule != null;
     var eventType = rule?.eventType ?? 'gift';
     var commandAction = _commandActions.first;
@@ -89,12 +92,14 @@ class RulesScreen extends StatelessWidget {
     final announcementController = TextEditingController(
       text:
           _announcementFromCommand(rule?.command ?? '') ??
-          '{user} envio un ${commandAction.visualName}',
+          l10n.t('rules.defaultUserSent', {'target': commandAction.visualName}),
     );
     final voiceMessageController = TextEditingController(
       text: rule?.voiceMessage.isNotEmpty == true
           ? rule!.voiceMessage
-          : '{user} envio un ${commandAction.visualName}',
+          : l10n.t('rules.defaultUserSent', {
+              'target': commandAction.visualName,
+            }),
     );
     final commandController = TextEditingController(text: rule?.command ?? '');
 
@@ -137,7 +142,11 @@ class RulesScreen extends StatelessWidget {
         return StatefulBuilder(
           builder: (context, setDialogState) {
             return AlertDialog(
-              title: Text(isEditing ? 'Editar comando' : 'Crear comando'),
+              title: Text(
+                isEditing
+                    ? l10n.t('rules.editCommand')
+                    : l10n.t('rules.createCommand'),
+              ),
               content: SizedBox(
                 width: 560,
                 child: SingleChildScrollView(
@@ -146,33 +155,36 @@ class RulesScreen extends StatelessWidget {
                     children: [
                       DropdownButtonFormField<String>(
                         initialValue: eventType,
-                        decoration: const InputDecoration(
-                          labelText: 'Evento TikTok',
-                          prefixIcon: Icon(Icons.bolt),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.tiktokEvent'),
+                          prefixIcon: const Icon(Icons.bolt),
+                          border: const OutlineInputBorder(),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: 'gift',
-                            child: Text('Regalo'),
+                            child: Text(l10n.t('event.gift')),
                           ),
                           DropdownMenuItem(
                             value: 'like',
-                            child: Text('Reaccion Like'),
+                            child: Text(l10n.t('event.likeReaction')),
                           ),
                           DropdownMenuItem(
                             value: 'follow',
-                            child: Text('Follow'),
+                            child: Text(l10n.t('event.follow')),
                           ),
                           DropdownMenuItem(
                             value: 'member',
-                            child: Text('Entrada al Live'),
+                            child: Text(l10n.t('event.liveEntry')),
                           ),
                           DropdownMenuItem(
                             value: 'share',
-                            child: Text('Share'),
+                            child: Text(l10n.t('event.share')),
                           ),
-                          DropdownMenuItem(value: 'chat', child: Text('Chat')),
+                          DropdownMenuItem(
+                            value: 'chat',
+                            child: Text(l10n.t('event.chat')),
+                          ),
                         ],
                         onChanged: (value) {
                           if (value == null) {
@@ -209,20 +221,20 @@ class RulesScreen extends StatelessWidget {
                         DropdownButtonFormField<_GiftOption>(
                           key: ValueKey(selectedGiftOption.trigger),
                           initialValue: selectedGiftOption,
-                          decoration: const InputDecoration(
-                            labelText: 'Tipo de regalo',
-                            prefixIcon: Icon(Icons.card_giftcard),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n.t('rules.giftType'),
+                            prefixIcon: const Icon(Icons.card_giftcard),
+                            border: const OutlineInputBorder(),
                           ),
                           items: [
                             for (final gift in _giftOptions)
                               DropdownMenuItem(
                                 value: gift,
-                                child: Text(gift.label),
+                                child: Text(_giftOptionLabel(gift, l10n)),
                               ),
-                            const DropdownMenuItem(
+                            DropdownMenuItem(
                               value: _customGiftOption,
-                              child: Text('Otro'),
+                              child: Text(l10n.t('common.other')),
                             ),
                           ],
                           onChanged: (value) {
@@ -241,11 +253,11 @@ class RulesScreen extends StatelessWidget {
                           const SizedBox(height: 12),
                           TextField(
                             controller: triggerController,
-                            decoration: const InputDecoration(
-                              labelText: 'Nombre exacto del regalo',
+                            decoration: InputDecoration(
+                              labelText: l10n.t('rules.exactGiftName'),
                               hintText: 'Rose',
-                              prefixIcon: Icon(Icons.edit),
-                              border: OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.edit),
+                              border: const OutlineInputBorder(),
                             ),
                           ),
                         ],
@@ -254,8 +266,8 @@ class RulesScreen extends StatelessWidget {
                           controller: triggerController,
                           decoration: InputDecoration(
                             labelText: eventType == 'chat'
-                                ? 'Mensaje exacto del chat'
-                                : 'Trigger',
+                                ? l10n.t('rules.exactChatMessage')
+                                : l10n.t('rules.trigger'),
                             hintText: eventType == 'chat' ? 'hola' : 'Like',
                             prefixIcon: const Icon(Icons.card_giftcard),
                             border: const OutlineInputBorder(),
@@ -264,16 +276,16 @@ class RulesScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<_CommandAction>(
                         initialValue: commandAction,
-                        decoration: const InputDecoration(
-                          labelText: 'Accion Minecraft',
-                          prefixIcon: Icon(Icons.auto_awesome),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.minecraftAction'),
+                          prefixIcon: const Icon(Icons.auto_awesome),
+                          border: const OutlineInputBorder(),
                         ),
                         items: [
                           for (final action in _commandActions)
                             DropdownMenuItem(
                               value: action,
-                              child: Text(action.label),
+                              child: Text(_commandActionLabel(action, l10n)),
                             ),
                         ],
                         onChanged: (value) {
@@ -282,12 +294,16 @@ class RulesScreen extends StatelessWidget {
                           }
                           setDialogState(() {
                             commandAction = value;
-                            announcementController.text =
-                                '{user} envio un ${value.visualName}';
+                            announcementController.text = l10n.t(
+                              'rules.defaultUserSent',
+                              {'target': value.visualName},
+                            );
                             if (!voiceEnabled ||
                                 voiceMessageController.text.trim().isEmpty) {
-                              voiceMessageController.text =
-                                  '{user} envio un ${value.visualName}';
+                              voiceMessageController.text = l10n.t(
+                                'rules.defaultUserSent',
+                                {'target': value.visualName},
+                              );
                             }
                             updateGeneratedCommand();
                           });
@@ -297,7 +313,7 @@ class RulesScreen extends StatelessWidget {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         secondary: const Icon(Icons.badge_outlined),
-                        title: const Text('Mostrar usuario en el spawn'),
+                        title: Text(l10n.t('rules.showUserOnSpawn')),
                         value: showUserNameOnSpawn,
                         onChanged: (value) {
                           setDialogState(() {
@@ -309,7 +325,7 @@ class RulesScreen extends StatelessWidget {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         secondary: const Icon(Icons.record_voice_over),
-                        title: const Text('Anunciar comando en chat'),
+                        title: Text(l10n.t('rules.announceCommandInChat')),
                         value: announceCommand,
                         onChanged: (value) {
                           setDialogState(() {
@@ -322,11 +338,11 @@ class RulesScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: announcementController,
-                          decoration: const InputDecoration(
-                            labelText: 'Mensaje del anuncio',
-                            hintText: '{user} envio un creeper',
-                            prefixIcon: Icon(Icons.chat_bubble_outline),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n.t('rules.announcementMessage'),
+                            hintText: l10n.t('rules.userSentCreeperHint'),
+                            prefixIcon: const Icon(Icons.chat_bubble_outline),
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) =>
                               setDialogState(updateGeneratedCommand),
@@ -336,14 +352,16 @@ class RulesScreen extends StatelessWidget {
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         secondary: const Icon(Icons.volume_up_outlined),
-                        title: const Text('Leer mensaje con voz'),
+                        title: Text(l10n.t('rules.readMessageWithVoice')),
                         value: voiceEnabled,
                         onChanged: (value) {
                           setDialogState(() {
                             voiceEnabled = value;
                             if (voiceMessageController.text.trim().isEmpty) {
-                              voiceMessageController.text =
-                                  '{user} envio un ${commandAction.visualName}';
+                              voiceMessageController.text = l10n.t(
+                                'rules.defaultUserSent',
+                                {'target': commandAction.visualName},
+                              );
                             }
                           });
                         },
@@ -352,11 +370,11 @@ class RulesScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: voiceMessageController,
-                          decoration: const InputDecoration(
-                            labelText: 'Texto para voz',
-                            hintText: '{user} envio un creeper',
-                            prefixIcon: Icon(Icons.spatial_audio_off),
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n.t('rules.voiceText'),
+                            hintText: l10n.t('rules.userSentCreeperHint'),
+                            prefixIcon: const Icon(Icons.spatial_audio_off),
+                            border: const OutlineInputBorder(),
                           ),
                         ),
                       ],
@@ -387,16 +405,16 @@ class RulesScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<_TargetMode>(
                         initialValue: targetMode,
-                        decoration: const InputDecoration(
-                          labelText: 'Dirigido a',
-                          prefixIcon: Icon(Icons.person_pin_circle),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.targetedTo'),
+                          prefixIcon: const Icon(Icons.person_pin_circle),
+                          border: const OutlineInputBorder(),
                         ),
                         items: [
                           for (final mode in _targetModes)
                             DropdownMenuItem(
                               value: mode,
-                              child: Text(mode.label),
+                              child: Text(_targetModeLabel(mode, l10n)),
                             ),
                         ],
                         onChanged: (value) {
@@ -413,11 +431,11 @@ class RulesScreen extends StatelessWidget {
                         const SizedBox(height: 12),
                         TextField(
                           controller: playerController,
-                          decoration: const InputDecoration(
-                            labelText: 'Nombre del jugador Minecraft',
+                          decoration: InputDecoration(
+                            labelText: l10n.t('rules.minecraftPlayerName'),
                             hintText: 'Nivroy',
-                            prefixIcon: Icon(Icons.person),
-                            border: OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.person),
+                            border: const OutlineInputBorder(),
                           ),
                           onChanged: (_) =>
                               setDialogState(updateGeneratedCommand),
@@ -426,16 +444,16 @@ class RulesScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<_PositionOption>(
                         initialValue: position,
-                        decoration: const InputDecoration(
-                          labelText: 'Posicion respecto al jugador',
-                          prefixIcon: Icon(Icons.explore),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.positionRelativeToPlayer'),
+                          prefixIcon: const Icon(Icons.explore),
+                          border: const OutlineInputBorder(),
                         ),
                         items: [
                           for (final option in _positions)
                             DropdownMenuItem(
                               value: option,
-                              child: Text(option.label),
+                              child: Text(_positionOptionLabel(option, l10n)),
                             ),
                         ],
                         onChanged: (value) {
@@ -451,11 +469,11 @@ class RulesScreen extends StatelessWidget {
                       const SizedBox(height: 12),
                       TextField(
                         controller: targetController,
-                        decoration: const InputDecoration(
-                          labelText: 'Nombre visual',
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.visualName'),
                           hintText: 'Creeper',
-                          prefixIcon: Icon(Icons.label),
-                          border: OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.label),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 12),
@@ -463,10 +481,10 @@ class RulesScreen extends StatelessWidget {
                         controller: commandController,
                         minLines: 2,
                         maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Comando generado',
-                          prefixIcon: Icon(Icons.terminal),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n.t('rules.generatedCommand'),
+                          prefixIcon: const Icon(Icons.terminal),
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                     ],
@@ -476,7 +494,7 @@ class RulesScreen extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancelar'),
+                  child: Text(l10n.t('common.cancel')),
                 ),
                 FilledButton.icon(
                   onPressed: () {
@@ -505,7 +523,9 @@ class RulesScreen extends StatelessWidget {
                     Navigator.of(dialogContext).pop();
                   },
                   icon: const Icon(Icons.save),
-                  label: Text(isEditing ? 'Actualizar' : 'Guardar'),
+                  label: Text(
+                    isEditing ? l10n.t('common.update') : l10n.t('common.save'),
+                  ),
                 ),
               ],
             );
@@ -561,6 +581,86 @@ String? _announcementFromCommand(String command) {
     }
   }
   return null;
+}
+
+String _giftOptionLabel(_GiftOption gift, AppLocalizations l10n) {
+  if (gift.isCustom) {
+    return l10n.t('common.other');
+  }
+  return switch (gift.trigger) {
+    'Rose' => l10n.t('gift.rose'),
+    'Doughnut' => l10n.t('gift.doughnut'),
+    'GG' => 'GG',
+    'Heart Me' => 'Heart Me',
+    'TikTok' => 'TikTok',
+    'Finger Heart' => 'Finger Heart',
+    'Perfume' => l10n.t('gift.perfume'),
+    'Cap' => l10n.t('gift.cap'),
+    _ => gift.label,
+  };
+}
+
+String _commandActionLabel(_CommandAction action, AppLocalizations l10n) {
+  return switch (action.entity) {
+    'minecraft:creeper' => l10n.t('action.spawnCreeper'),
+    'minecraft:zombie' => l10n.t('action.spawnZombie'),
+    'minecraft:skeleton' => l10n.t('action.spawnSkeleton'),
+    'minecraft:tnt' => l10n.t('action.spawnTnt'),
+    'minecraft:enderman' => l10n.t('action.spawnEnderman'),
+    'minecraft:spider' => l10n.t('action.spawnSpider'),
+    'minecraft:witch' => l10n.t('action.spawnWitch'),
+    'minecraft:lightning_bolt' => l10n.t('action.summonLightning'),
+    _ => action.label,
+  };
+}
+
+String _targetModeLabel(_TargetMode mode, AppLocalizations l10n) {
+  return switch (mode.value) {
+    'all' => l10n.t('target.all'),
+    'random' => l10n.t('target.random'),
+    'player' => l10n.t('target.player'),
+    _ => mode.label,
+  };
+}
+
+String _positionOptionLabel(_PositionOption option, AppLocalizations l10n) {
+  return switch (option.coordinates) {
+    '~ ~ ~' => l10n.t('position.onPlayer'),
+    '~ ~2 ~' => l10n.t('position.abovePlayer'),
+    '~ ~-1 ~' => l10n.t('position.belowPlayer'),
+    '^ ^ ^2' => l10n.t('position.inFrontOfPlayer'),
+    '^ ^ ^-2' => l10n.t('position.behindPlayer'),
+    '^-2 ^ ^' => l10n.t('position.left'),
+    '^2 ^ ^' => l10n.t('position.right'),
+    _ => option.label,
+  };
+}
+
+String _armorSlotLabel(_ArmorSlot slot, AppLocalizations l10n) {
+  return switch (slot.equipmentSlot) {
+    'armor.head' => l10n.t('armor.helmet'),
+    'armor.chest' => l10n.t('armor.chestplate'),
+    'armor.legs' => l10n.t('armor.leggings'),
+    'armor.feet' => l10n.t('armor.boots'),
+    _ => slot.label,
+  };
+}
+
+String _armorMaterialLabel(_ArmorMaterial material, AppLocalizations l10n) {
+  return switch (material.value) {
+    'golden' => l10n.t('armor.gold'),
+    'diamond' => l10n.t('armor.diamond'),
+    'iron' => l10n.t('armor.iron'),
+    _ => material.label,
+  };
+}
+
+String _weaponOptionLabel(_WeaponOption weapon, AppLocalizations l10n) {
+  return switch (weapon.itemId) {
+    'minecraft:iron_sword' => l10n.t('weapon.sword'),
+    'minecraft:iron_axe' => l10n.t('weapon.axe'),
+    _ => weapon.label,
+  };
 }
 
 class _GiftOption {
@@ -831,13 +931,15 @@ class _EquipmentSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Align(
           alignment: Alignment.centerLeft,
           child: Text(
-            'Armadura',
+            l10n.t('rules.armor'),
             style: Theme.of(context).textTheme.titleSmall,
           ),
         ),
@@ -854,7 +956,10 @@ class _EquipmentSection extends StatelessWidget {
           const SizedBox(height: 4),
           Align(
             alignment: Alignment.centerLeft,
-            child: Text('Arma', style: Theme.of(context).textTheme.titleSmall),
+            child: Text(
+              l10n.t('rules.weapon'),
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
           ),
           const SizedBox(height: 8),
           Wrap(
@@ -863,7 +968,7 @@ class _EquipmentSection extends StatelessWidget {
             children: [
               for (final weapon in _zombieWeapons)
                 FilterChip(
-                  label: Text(weapon.label),
+                  label: Text(_weaponOptionLabel(weapon, l10n)),
                   selected: zombieWeapon == weapon,
                   onSelected: (selected) =>
                       onZombieWeaponChanged(weapon, selected),
@@ -890,10 +995,15 @@ class _ArmorSlotSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(slot.label, style: Theme.of(context).textTheme.labelLarge),
+        Text(
+          _armorSlotLabel(slot, l10n),
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
@@ -901,7 +1011,7 @@ class _ArmorSlotSelector extends StatelessWidget {
           children: [
             for (final material in _armorMaterials)
               FilterChip(
-                label: Text(material.label),
+                label: Text(_armorMaterialLabel(material, l10n)),
                 selected: selectedMaterial == material,
                 onSelected: (selected) => onChanged(slot, material, selected),
               ),
@@ -1032,6 +1142,7 @@ class _RuleCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     return Card(
       child: Opacity(
@@ -1046,18 +1157,18 @@ class _RuleCard extends StatelessWidget {
             children: [
               Text(rule.trigger),
               Chip(
-                label: Text(_eventTypeLabel(rule.eventType)),
+                label: Text(_eventTypeLabel(rule.eventType, l10n)),
                 visualDensity: VisualDensity.compact,
               ),
               if (!rule.enabled)
-                const Chip(
-                  label: Text('Apagado'),
+                Chip(
+                  label: Text(l10n.t('status.off')),
                   visualDensity: VisualDensity.compact,
                 ),
               if (rule.voiceEnabled)
-                const Chip(
-                  avatar: Icon(Icons.volume_up, size: 16),
-                  label: Text('Voz'),
+                Chip(
+                  avatar: const Icon(Icons.volume_up, size: 16),
+                  label: Text(l10n.t('rules.voice')),
                   visualDensity: VisualDensity.compact,
                 ),
             ],
@@ -1075,7 +1186,7 @@ class _RuleCard extends StatelessWidget {
                     : (value) => appState.toggleRule(rule, value),
               ),
               IconButton(
-                tooltip: 'Editar regla',
+                tooltip: l10n.t('rules.editRule'),
                 onPressed: appState.isBusy
                     ? null
                     : () => const RulesScreen()._showRuleDialog(
@@ -1086,15 +1197,15 @@ class _RuleCard extends StatelessWidget {
               ),
               IconButton(
                 tooltip: rule.enabled
-                    ? 'Probar comando'
-                    : 'Activa la regla para probarla',
+                    ? l10n.t('rules.testCommand')
+                    : l10n.t('rules.enableRuleToTest'),
                 onPressed: appState.isBusy || !rule.enabled
                     ? null
                     : () => appState.testRule(rule),
                 icon: const Icon(Icons.play_arrow),
               ),
               IconButton(
-                tooltip: 'Eliminar regla',
+                tooltip: l10n.t('rules.deleteRule'),
                 onPressed: appState.isBusy
                     ? null
                     : () => appState.deleteRule(rule),
@@ -1107,14 +1218,14 @@ class _RuleCard extends StatelessWidget {
     );
   }
 
-  String _eventTypeLabel(String eventType) {
+  String _eventTypeLabel(String eventType, AppLocalizations l10n) {
     return switch (eventType) {
-      'gift' => 'Regalo',
-      'like' => 'Like',
-      'follow' => 'Follow',
-      'member' => 'Entrada',
-      'share' => 'Share',
-      'chat' => 'Chat',
+      'gift' => l10n.t('event.gift'),
+      'like' => l10n.t('event.like'),
+      'follow' => l10n.t('event.follow'),
+      'member' => l10n.t('event.member'),
+      'share' => l10n.t('event.share'),
+      'chat' => l10n.t('event.chat'),
       _ => eventType,
     };
   }

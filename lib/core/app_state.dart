@@ -25,6 +25,7 @@ class AppState extends ChangeNotifier {
   static const _authExpiresAtKey = 'auth_expires_at';
   static const _authEmailKey = 'auth_email';
   static const _authUidKey = 'auth_uid';
+  static const _languageCodeKey = 'language_code';
   static const _environmentBackendUrl = String.fromEnvironment(
     'BACKEND_URL',
     defaultValue: 'http://localhost:3000',
@@ -75,6 +76,7 @@ class AppState extends ChangeNotifier {
   bool isAuthenticated = false;
   bool isEmailVerified = false;
   bool websocketConnected = false;
+  String languageCode = 'es';
   String authEmail = '';
   String authUid = '';
   String _idToken = '';
@@ -121,6 +123,13 @@ class AppState extends ChangeNotifier {
       return _defaultServerTapPort;
     }
     return parsed.toString();
+  }
+
+  static String _normalizeLanguageCode(String value) {
+    return switch (value.trim().toLowerCase()) {
+      'en' => 'en',
+      _ => 'es',
+    };
   }
 
   static String composeServerTapUrl({
@@ -201,6 +210,9 @@ class AppState extends ChangeNotifier {
     exarotonToken = prefs.getString(_exarotonTokenKey) ?? exarotonToken;
     exarotonServerId =
         prefs.getString(_exarotonServerIdKey) ?? exarotonServerId;
+    languageCode = _normalizeLanguageCode(
+      prefs.getString(_languageCodeKey) ?? languageCode,
+    );
     _idToken = prefs.getString(_authIdTokenKey) ?? '';
     _refreshToken = prefs.getString(_authRefreshTokenKey) ?? '';
     authEmail = prefs.getString(_authEmailKey) ?? '';
@@ -225,6 +237,18 @@ class AppState extends ChangeNotifier {
       await _autoConnectExaroton();
     }
     isInitialized = true;
+    notifyListeners();
+  }
+
+  Future<void> setLanguageCode(String value) async {
+    final nextLanguageCode = _normalizeLanguageCode(value);
+    if (languageCode == nextLanguageCode) {
+      return;
+    }
+
+    languageCode = nextLanguageCode;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_languageCodeKey, languageCode);
     notifyListeners();
   }
 

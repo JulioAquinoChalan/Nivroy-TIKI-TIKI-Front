@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/app_state.dart';
+import '../../l10n/app_localizations.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -56,6 +57,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   @override
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
+    final l10n = context.l10n;
 
     if (_tiktokUsernameController.text.isEmpty &&
         appState.tiktokUsername.isNotEmpty) {
@@ -73,7 +75,10 @@ class _DashboardScreenState extends State<DashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Dashboard', style: Theme.of(context).textTheme.headlineMedium),
+        Text(
+          l10n.t('dashboard.title'),
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
         const SizedBox(height: 16),
         GridView.count(
           crossAxisCount: MediaQuery.sizeOf(context).width > 700 ? 2 : 1,
@@ -86,22 +91,22 @@ class _DashboardScreenState extends State<DashboardScreen>
             _StatusCard(
               label: 'TikTok Live',
               value: appState.isAutoConnectingTikTok
-                  ? 'Conectando...'
+                  ? l10n.t('status.connecting')
                   : appState.health.tiktokConnected
-                  ? 'Conectado'
-                  : 'Desconectado',
+                  ? l10n.t('status.connected')
+                  : l10n.t('status.disconnected'),
               active: appState.health.tiktokConnected,
               icon: Icons.live_tv,
             ),
             _StatusCard(
               label: 'Minecraft',
               value: appState.isAutoConnectingServerTap
-                  ? 'Conectando...'
+                  ? l10n.t('status.connecting')
                   : appState.exarotonConnected
                   ? appState.exarotonServerName
                   : appState.serverTapConnected
-                  ? 'ServerTap listo'
-                  : 'Sin conexion',
+                  ? l10n.t('dashboard.serverTapReady')
+                  : l10n.t('status.noConnection'),
               active: appState.serverTapConnected || appState.exarotonConnected,
               icon: Icons.sports_esports,
             ),
@@ -187,6 +192,7 @@ class _TikTokConnectionCardState extends State<_TikTokConnectionCard> {
   Widget build(BuildContext context) {
     final appState = widget.appState;
     final tiktokUsernameController = widget.tiktokUsernameController;
+    final l10n = context.l10n;
     final canConnect = !appState.isBusy && _hasTikTokUsername;
     final canDisconnect = !appState.isBusy && appState.health.tiktokConnected;
 
@@ -198,8 +204,10 @@ class _TikTokConnectionCardState extends State<_TikTokConnectionCard> {
           children: [
             _ConnectionHeader(
               icon: Icons.live_tv,
-              title: 'Conexion TikTok Live',
-              badge: appState.health.tiktokConnected ? 'Conectado' : 'Live',
+              title: l10n.t('dashboard.tiktokConnection'),
+              badge: appState.health.tiktokConnected
+                  ? l10n.t('status.connected')
+                  : 'Live',
               badgeIcon: Icons.sensors,
               active: appState.health.tiktokConnected,
             ),
@@ -214,11 +222,11 @@ class _TikTokConnectionCardState extends State<_TikTokConnectionCard> {
                     controller: tiktokUsernameController,
                     enabled: !appState.isBusy,
                     textInputAction: TextInputAction.done,
-                    decoration: const InputDecoration(
-                      labelText: 'Usuario TikTok',
+                    decoration: InputDecoration(
+                      labelText: l10n.t('dashboard.tiktokUser'),
                       hintText: 'usuario_tiktok',
-                      prefixIcon: Icon(Icons.alternate_email),
-                      border: OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.alternate_email),
+                      border: const OutlineInputBorder(),
                     ),
                     onSubmitted: canConnect
                         ? (value) => appState.connectTikTok(username: value)
@@ -233,12 +241,12 @@ class _TikTokConnectionCardState extends State<_TikTokConnectionCard> {
                         )
                       : null,
                   icon: const Icon(Icons.link),
-                  label: const Text('Conectar TikTok'),
+                  label: Text(l10n.t('dashboard.connectTikTok')),
                 ),
                 OutlinedButton.icon(
                   onPressed: canDisconnect ? appState.disconnectTikTok : null,
                   icon: const Icon(Icons.link_off),
-                  label: const Text('Desconectar TikTok'),
+                  label: Text(l10n.t('dashboard.disconnectTikTok')),
                 ),
               ],
             ),
@@ -277,6 +285,7 @@ class _MinecraftConnectionTabsState extends State<_MinecraftConnectionTabs> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     return Card(
       child: Column(
@@ -297,14 +306,14 @@ class _MinecraftConnectionTabsState extends State<_MinecraftConnectionTabs> {
               unselectedLabelColor: colorScheme.onSurfaceVariant,
               indicatorSize: TabBarIndicatorSize.tab,
               onTap: (value) => setState(() => _selectedIndex = value),
-              tabs: const [
+              tabs: [
                 Tab(
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.computer),
-                      SizedBox(width: 8),
-                      Text('Minecraft local'),
+                      const Icon(Icons.computer),
+                      const SizedBox(width: 8),
+                      Text(l10n.t('dashboard.minecraftLocal')),
                     ],
                   ),
                 ),
@@ -312,9 +321,9 @@ class _MinecraftConnectionTabsState extends State<_MinecraftConnectionTabs> {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.cloud_outlined),
-                      SizedBox(width: 8),
-                      Text('Minecraft Exaroton'),
+                      const Icon(Icons.cloud_outlined),
+                      const SizedBox(width: 8),
+                      Text(l10n.t('dashboard.minecraftExaroton')),
                     ],
                   ),
                 ),
@@ -362,12 +371,14 @@ class _LocalConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _ConnectionHeader(
           icon: Icons.router,
-          title: 'Conexion ServerTap local',
+          title: l10n.t('dashboard.localServerTapConnection'),
           badge: 'Local',
           badgeIcon: Icons.lan_outlined,
           active: appState.serverTapConnected,
@@ -383,11 +394,11 @@ class _LocalConnectionCard extends StatelessWidget {
                 controller: serverTapHostController,
                 textInputAction: TextInputAction.next,
                 keyboardType: TextInputType.url,
-                decoration: const InputDecoration(
-                  labelText: 'IP ServerTap local',
+                decoration: InputDecoration(
+                  labelText: l10n.t('dashboard.localServerTapIp'),
                   hintText: '127.0.0.1',
-                  prefixIcon: Icon(Icons.router),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.router),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _saveConnection(),
               ),
@@ -399,11 +410,11 @@ class _LocalConnectionCard extends StatelessWidget {
                 textInputAction: TextInputAction.next,
                 keyboardType: TextInputType.number,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Puerto',
+                decoration: InputDecoration(
+                  labelText: l10n.t('dashboard.port'),
                   hintText: '4567',
-                  prefixIcon: Icon(Icons.numbers),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.numbers),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _saveConnection(),
               ),
@@ -414,10 +425,10 @@ class _LocalConnectionCard extends StatelessWidget {
                 controller: serverTapKeyController,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'API key local',
-                  prefixIcon: Icon(Icons.key),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.t('dashboard.localApiKey'),
+                  prefixIcon: const Icon(Icons.key),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (_) => _saveConnection(),
               ),
@@ -432,14 +443,14 @@ class _LocalConnectionCard extends StatelessWidget {
             FilledButton.tonalIcon(
               onPressed: appState.isBusy ? null : appState.connectServerTap,
               icon: const Icon(Icons.router),
-              label: const Text('Conectar local'),
+              label: Text(l10n.t('dashboard.connectLocal')),
             ),
             OutlinedButton.icon(
               onPressed: appState.serverTapConnected && !appState.isBusy
                   ? appState.disconnectServerTap
                   : null,
               icon: const Icon(Icons.link_off),
-              label: const Text('Desconectar'),
+              label: Text(l10n.t('common.disconnect')),
             ),
           ],
         ),
@@ -459,6 +470,7 @@ class _ExarotonConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     final selectedServerId =
         appState.exarotonServers.any(
           (server) => server.id == appState.exarotonServerId,
@@ -471,8 +483,10 @@ class _ExarotonConnectionCard extends StatelessWidget {
       children: [
         _ConnectionHeader(
           icon: Icons.cloud_outlined,
-          title: 'Conexion por API Exaroton',
-          badge: appState.exarotonConnected ? 'Conectado' : 'API externa',
+          title: l10n.t('dashboard.exarotonApiConnection'),
+          badge: appState.exarotonConnected
+              ? l10n.t('status.connected')
+              : l10n.t('dashboard.externalApi'),
           badgeIcon: Icons.cloud_queue,
           active: appState.exarotonConnected,
         ),
@@ -489,10 +503,10 @@ class _ExarotonConnectionCard extends StatelessWidget {
                 enabled: !appState.isBusy && !appState.isLoadingExarotonServers,
                 obscureText: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Token Exaroton',
-                  prefixIcon: Icon(Icons.vpn_key_outlined),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.t('dashboard.exarotonToken'),
+                  prefixIcon: const Icon(Icons.vpn_key_outlined),
+                  border: const OutlineInputBorder(),
                 ),
                 onChanged: (value) => appState.saveExarotonConnection(
                   token: value,
@@ -505,12 +519,12 @@ class _ExarotonConnectionCard extends StatelessWidget {
               child: DropdownButtonFormField<String>(
                 initialValue: selectedServerId,
                 isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Servidor Exaroton',
-                  prefixIcon: Icon(Icons.storage_outlined),
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n.t('dashboard.exarotonServer'),
+                  prefixIcon: const Icon(Icons.storage_outlined),
+                  border: const OutlineInputBorder(),
                 ),
-                hint: const Text('Selecciona un servidor'),
+                hint: Text(l10n.t('dashboard.selectServer')),
                 items: [
                   for (final server in appState.exarotonServers)
                     DropdownMenuItem(
@@ -539,14 +553,14 @@ class _ExarotonConnectionCard extends StatelessWidget {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.refresh),
-              label: const Text('Cargar servidores'),
+              label: Text(l10n.t('dashboard.loadServers')),
             ),
           ],
         ),
         if (appState.exarotonServerId.isNotEmpty) ...[
           const SizedBox(height: 8),
           Text(
-            'ID seleccionado: ${appState.exarotonServerId}',
+            l10n.t('dashboard.selectedId', {'id': appState.exarotonServerId}),
             style: Theme.of(context).textTheme.bodySmall,
           ),
         ],
@@ -560,14 +574,14 @@ class _ExarotonConnectionCard extends StatelessWidget {
                   ? null
                   : appState.connectExaroton,
               icon: const Icon(Icons.cloud_sync_outlined),
-              label: const Text('Conectar Exaroton'),
+              label: Text(l10n.t('dashboard.connectExaroton')),
             ),
             OutlinedButton.icon(
               onPressed: appState.isBusy || appState.isLoadingExarotonServers
                   ? null
                   : appState.testExarotonCommand,
               icon: const Icon(Icons.terminal),
-              label: const Text('Enviar comando'),
+              label: Text(l10n.t('dashboard.sendCommand')),
             ),
           ],
         ),

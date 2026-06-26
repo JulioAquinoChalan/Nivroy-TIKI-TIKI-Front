@@ -14,7 +14,7 @@ Flutter app multiplataforma con Material 3, tema oscuro y dashboard para control
 
 ```bash
 flutter pub get
-cp .env.example env
+cp .env.example .env
 flutter run -d chrome
 flutter build web --release
 ```

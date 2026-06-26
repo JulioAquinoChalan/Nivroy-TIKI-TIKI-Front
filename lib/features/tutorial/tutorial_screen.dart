@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/app_design.dart';
 import '../../l10n/app_localizations.dart';
 
 class TutorialScreen extends StatefulWidget {
@@ -44,9 +45,15 @@ class _TutorialScreenState extends State<TutorialScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          l10n.t('tutorial.title'),
-          style: Theme.of(context).textTheme.headlineMedium,
+        PageHeader(
+          icon: Icons.school_outlined,
+          title: l10n.t('tutorial.title'),
+          subtitle: l10n.t('tutorial.subtitle'),
+          trailing: StatusPill(
+            label: l10n.t(tutorial.tabLabelKey),
+            icon: tutorial.icon,
+            active: true,
+          ),
         ),
         const SizedBox(height: 16),
         Card(

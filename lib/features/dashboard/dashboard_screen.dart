@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_design.dart';
 import '../../core/app_state.dart';
 import '../../l10n/app_localizations.dart';
 
@@ -75,9 +76,19 @@ class _DashboardScreenState extends State<DashboardScreen>
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          l10n.t('dashboard.title'),
-          style: Theme.of(context).textTheme.headlineMedium,
+        PageHeader(
+          icon: Icons.hub_outlined,
+          title: l10n.t('dashboard.title'),
+          subtitle: l10n.t('dashboard.subtitle'),
+          trailing: StatusPill(
+            label: appState.websocketConnected
+                ? l10n.t('dashboard.systemOnline')
+                : l10n.t('dashboard.systemOffline'),
+            icon: appState.websocketConnected
+                ? Icons.sensors
+                : Icons.sensors_off_outlined,
+            active: appState.websocketConnected,
+          ),
         ),
         const SizedBox(height: 16),
         GridView.count(
@@ -86,7 +97,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           mainAxisSpacing: 12,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          childAspectRatio: MediaQuery.sizeOf(context).width > 700 ? 5.2 : 4.6,
+          childAspectRatio: MediaQuery.sizeOf(context).width > 700 ? 4.1 : 3.4,
           children: [
             _StatusCard(
               label: 'TikTok Live',
@@ -133,12 +144,9 @@ class _DashboardScreenState extends State<DashboardScreen>
         ),
         if (appState.lastError != null) ...[
           const SizedBox(height: 16),
-          Card(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(appState.lastError!),
-            ),
+          SectionCard(
+            padding: const EdgeInsets.all(16),
+            child: Text(appState.lastError!),
           ),
         ],
       ],
@@ -196,62 +204,59 @@ class _TikTokConnectionCardState extends State<_TikTokConnectionCard> {
     final canConnect = !appState.isBusy && _hasTikTokUsername;
     final canDisconnect = !appState.isBusy && appState.health.tiktokConnected;
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ConnectionHeader(
-              icon: Icons.live_tv,
-              title: l10n.t('dashboard.tiktokConnection'),
-              badge: appState.health.tiktokConnected
-                  ? l10n.t('status.connected')
-                  : 'Live',
-              badgeIcon: Icons.sensors,
-              active: appState.health.tiktokConnected,
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                SizedBox(
-                  width: 360,
-                  child: TextField(
-                    controller: tiktokUsernameController,
-                    enabled: !appState.isBusy,
-                    textInputAction: TextInputAction.done,
-                    decoration: InputDecoration(
-                      labelText: l10n.t('dashboard.tiktokUser'),
-                      hintText: 'usuario_tiktok',
-                      prefixIcon: const Icon(Icons.alternate_email),
-                      border: const OutlineInputBorder(),
-                    ),
-                    onSubmitted: canConnect
-                        ? (value) => appState.connectTikTok(username: value)
-                        : null,
-                    onChanged: appState.saveTikTokUsername,
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ConnectionHeader(
+            icon: Icons.live_tv,
+            title: l10n.t('dashboard.tiktokConnection'),
+            badge: appState.health.tiktokConnected
+                ? l10n.t('status.connected')
+                : 'Live',
+            badgeIcon: Icons.sensors,
+            active: appState.health.tiktokConnected,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              SizedBox(
+                width: 360,
+                child: TextField(
+                  controller: tiktokUsernameController,
+                  enabled: !appState.isBusy,
+                  textInputAction: TextInputAction.done,
+                  decoration: InputDecoration(
+                    labelText: l10n.t('dashboard.tiktokUser'),
+                    hintText: 'usuario_tiktok',
+                    prefixIcon: const Icon(Icons.alternate_email),
+                    border: const OutlineInputBorder(),
                   ),
-                ),
-                FilledButton.icon(
-                  onPressed: canConnect
-                      ? () => appState.connectTikTok(
-                          username: tiktokUsernameController.text,
-                        )
+                  onSubmitted: canConnect
+                      ? (value) => appState.connectTikTok(username: value)
                       : null,
-                  icon: const Icon(Icons.link),
-                  label: Text(l10n.t('dashboard.connectTikTok')),
+                  onChanged: appState.saveTikTokUsername,
                 ),
-                OutlinedButton.icon(
-                  onPressed: canDisconnect ? appState.disconnectTikTok : null,
-                  icon: const Icon(Icons.link_off),
-                  label: Text(l10n.t('dashboard.disconnectTikTok')),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+              FilledButton.icon(
+                onPressed: canConnect
+                    ? () => appState.connectTikTok(
+                        username: tiktokUsernameController.text,
+                      )
+                    : null,
+                icon: const Icon(Icons.link),
+                label: Text(l10n.t('dashboard.connectTikTok')),
+              ),
+              OutlinedButton.icon(
+                onPressed: canDisconnect ? appState.disconnectTikTok : null,
+                icon: const Icon(Icons.link_off),
+                label: Text(l10n.t('dashboard.disconnectTikTok')),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -608,13 +613,6 @@ class _ConnectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final badgeColor = active
-        ? colorScheme.primaryContainer
-        : colorScheme.surfaceContainerHighest;
-    final foregroundColor = active
-        ? colorScheme.onPrimaryContainer
-        : colorScheme.onSurfaceVariant;
-
     return Row(
       children: [
         Icon(icon, color: active ? colorScheme.primary : colorScheme.secondary),
@@ -622,26 +620,7 @@ class _ConnectionHeader extends StatelessWidget {
         Expanded(
           child: Text(title, style: Theme.of(context).textTheme.titleMedium),
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: badgeColor,
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(badgeIcon, size: 16, color: foregroundColor),
-              const SizedBox(width: 6),
-              Text(
-                badge,
-                style: Theme.of(
-                  context,
-                ).textTheme.labelMedium?.copyWith(color: foregroundColor),
-              ),
-            ],
-          ),
-        ),
+        StatusPill(label: badge, icon: badgeIcon, active: active),
       ],
     );
   }
@@ -662,22 +641,46 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? Colors.greenAccent : Colors.redAccent;
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = active ? AppColors.mint : AppColors.coral;
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 10),
+            Container(
+              width: 42,
+              height: 42,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(icon, color: color, size: 22),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(label, style: Theme.of(context).textTheme.labelMedium),
-                  Text(value, style: Theme.of(context).textTheme.titleMedium),
+                  Text(
+                    label.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
                 ],
               ),
             ),

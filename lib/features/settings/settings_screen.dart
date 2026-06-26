@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_design.dart';
 import '../../core/app_state.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/minecraft_rule.dart';
@@ -18,76 +19,81 @@ class SettingsScreen extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text(
-          l10n.t('settings.title'),
-          style: Theme.of(context).textTheme.headlineMedium,
+        PageHeader(
+          icon: Icons.settings_outlined,
+          title: l10n.t('settings.title'),
+          subtitle: l10n.t('settings.subtitle'),
+          trailing: StatusPill(
+            label: appState.authEmail.isEmpty
+                ? l10n.t('settings.session')
+                : appState.authEmail,
+            icon: Icons.account_circle_outlined,
+            active: appState.authEmail.isNotEmpty,
+          ),
         ),
         const SizedBox(height: 16),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.account_circle_outlined),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        appState.authEmail,
-                        style: Theme.of(context).textTheme.titleMedium,
+        SectionCard(
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.account_circle_outlined),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      appState.authEmail,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: appState.isBusy ? null : appState.logout,
+                    icon: const Icon(Icons.logout),
+                    label: Text(l10n.t('common.logout')),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              Row(
+                children: [
+                  const Icon(Icons.language),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      l10n.t('settings.language'),
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 180,
+                    child: DropdownButtonFormField<String>(
+                      initialValue: appState.languageCode,
+                      decoration: InputDecoration(
+                        labelText: l10n.t('settings.languageField'),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
                       ),
-                    ),
-                    TextButton.icon(
-                      onPressed: appState.isBusy ? null : appState.logout,
-                      icon: const Icon(Icons.logout),
-                      label: Text(l10n.t('common.logout')),
-                    ),
-                  ],
-                ),
-                const Divider(height: 24),
-                Row(
-                  children: [
-                    const Icon(Icons.language),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        l10n.t('settings.language'),
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                    ),
-                    SizedBox(
-                      width: 180,
-                      child: DropdownButtonFormField<String>(
-                        initialValue: appState.languageCode,
-                        decoration: InputDecoration(
-                          labelText: l10n.t('settings.languageField'),
-                          border: const OutlineInputBorder(),
-                          isDense: true,
+                      items: [
+                        DropdownMenuItem(
+                          value: 'es',
+                          child: Text(l10n.t('settings.languageSpanish')),
                         ),
-                        items: [
-                          DropdownMenuItem(
-                            value: 'es',
-                            child: Text(l10n.t('settings.languageSpanish')),
-                          ),
-                          DropdownMenuItem(
-                            value: 'en',
-                            child: Text(l10n.t('settings.languageEnglish')),
-                          ),
-                        ],
-                        onChanged: appState.isBusy
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  appState.setLanguageCode(value);
-                                }
-                              },
-                      ),
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Text(l10n.t('settings.languageEnglish')),
+                        ),
+                      ],
+                      onChanged: appState.isBusy
+                          ? null
+                          : (value) {
+                              if (value != null) {
+                                appState.setLanguageCode(value);
+                              }
+                            },
                     ),
-                  ],
-                ),
-              ],
-            ),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
         const SizedBox(height: 16),
@@ -135,37 +141,34 @@ class _OverlaySettingsCardState extends State<_OverlaySettingsCard> {
       ),
     ];
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    l10n.t('settings.overlayLiveStudio'),
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
+    return SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n.t('settings.overlayLiveStudio'),
+                  style: Theme.of(context).textTheme.titleLarge,
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _OverlayUrlSection(
-              overlay: overlays[0],
-              previewVisible: false,
-              onTogglePreview: _togglePreview,
-            ),
-            const SizedBox(height: 18),
-            _OverlayUrlSection(
-              overlay: overlays[1],
-              previewVisible: _visiblePreview == overlays[1].preview,
-              onTogglePreview: _togglePreview,
-              preview: _OverlayPreview(rules: appState.rules),
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _OverlayUrlSection(
+            overlay: overlays[0],
+            previewVisible: false,
+            onTogglePreview: _togglePreview,
+          ),
+          const SizedBox(height: 18),
+          _OverlayUrlSection(
+            overlay: overlays[1],
+            previewVisible: _visiblePreview == overlays[1].preview,
+            onTogglePreview: _togglePreview,
+            preview: _OverlayPreview(rules: appState.rules),
+          ),
+        ],
       ),
     );
   }

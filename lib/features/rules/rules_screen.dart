@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/app_design.dart';
 import '../../core/app_state.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/minecraft_rule.dart';
@@ -14,32 +15,34 @@ class RulesScreen extends StatelessWidget {
     final l10n = context.l10n;
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n.t('rules.title'),
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-              ),
-              FilledButton.icon(
+          PageHeader(
+            icon: Icons.rule_outlined,
+            title: l10n.t('rules.title'),
+            subtitle: l10n.t('rules.subtitle'),
+            trailing: FilledButton.icon(
+              onPressed: appState.isBusy
+                  ? null
+                  : () => _showRuleDialog(context),
+              icon: const Icon(Icons.add),
+              label: Text(l10n.t('rules.createCommand')),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (appState.rules.isEmpty)
+            EmptyState(
+              icon: Icons.auto_awesome_outlined,
+              title: l10n.t('rules.empty'),
+              message: l10n.t('rules.emptyHint'),
+              action: FilledButton.icon(
                 onPressed: appState.isBusy
                     ? null
                     : () => _showRuleDialog(context),
                 icon: const Icon(Icons.add),
                 label: Text(l10n.t('rules.createCommand')),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (appState.rules.isEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(l10n.t('rules.empty')),
               ),
             )
           else
@@ -1143,73 +1146,125 @@ class _RuleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final appState = context.watch<AppState>();
     final l10n = context.l10n;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       child: Opacity(
         opacity: rule.enabled ? 1 : 0.55,
-        child: ListTile(
-          leading: Icon(
-            rule.enabled ? Icons.auto_awesome : Icons.auto_awesome_outlined,
-          ),
-          title: Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(rule.trigger),
-              Chip(
-                label: Text(_eventTypeLabel(rule.eventType, l10n)),
-                visualDensity: VisualDensity.compact,
-              ),
-              if (!rule.enabled)
-                Chip(
-                  label: Text(l10n.t('status.off')),
-                  visualDensity: VisualDensity.compact,
+              Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: rule.enabled
+                      ? colorScheme.primaryContainer
+                      : colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
                 ),
-              if (rule.voiceEnabled)
-                Chip(
-                  avatar: const Icon(Icons.volume_up, size: 16),
-                  label: Text(l10n.t('rules.voice')),
-                  visualDensity: VisualDensity.compact,
+                child: Icon(
+                  rule.enabled
+                      ? Icons.auto_awesome
+                      : Icons.auto_awesome_outlined,
+                  color: rule.enabled
+                      ? colorScheme.onPrimaryContainer
+                      : colorScheme.onSurfaceVariant,
                 ),
-            ],
-          ),
-          subtitle: Text(rule.command),
-          trailing: Wrap(
-            spacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(rule.target),
-              Switch(
-                value: rule.enabled,
-                onChanged: appState.isBusy
-                    ? null
-                    : (value) => appState.toggleRule(rule, value),
               ),
-              IconButton(
-                tooltip: l10n.t('rules.editRule'),
-                onPressed: appState.isBusy
-                    ? null
-                    : () => const RulesScreen()._showRuleDialog(
-                        context,
-                        rule: rule,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        Text(
+                          rule.trigger,
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        Chip(
+                          label: Text(_eventTypeLabel(rule.eventType, l10n)),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        if (!rule.enabled)
+                          Chip(
+                            label: Text(l10n.t('status.off')),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                        if (rule.voiceEnabled)
+                          Chip(
+                            avatar: const Icon(Icons.volume_up, size: 16),
+                            label: Text(l10n.t('rules.voice')),
+                            visualDensity: VisualDensity.compact,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      rule.target,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colorScheme.primary,
+                        fontWeight: FontWeight.w800,
                       ),
-                icon: const Icon(Icons.edit_outlined),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      rule.command,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-              IconButton(
-                tooltip: rule.enabled
-                    ? l10n.t('rules.testCommand')
-                    : l10n.t('rules.enableRuleToTest'),
-                onPressed: appState.isBusy || !rule.enabled
-                    ? null
-                    : () => appState.testRule(rule),
-                icon: const Icon(Icons.play_arrow),
-              ),
-              IconButton(
-                tooltip: l10n.t('rules.deleteRule'),
-                onPressed: appState.isBusy
-                    ? null
-                    : () => appState.deleteRule(rule),
-                icon: const Icon(Icons.delete_outline),
+              const SizedBox(width: 8),
+              Wrap(
+                spacing: 4,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Switch(
+                    value: rule.enabled,
+                    onChanged: appState.isBusy
+                        ? null
+                        : (value) => appState.toggleRule(rule, value),
+                  ),
+                  IconButton(
+                    tooltip: l10n.t('rules.editRule'),
+                    onPressed: appState.isBusy
+                        ? null
+                        : () => const RulesScreen()._showRuleDialog(
+                            context,
+                            rule: rule,
+                          ),
+                    icon: const Icon(Icons.edit_outlined),
+                  ),
+                  IconButton(
+                    tooltip: rule.enabled
+                        ? l10n.t('rules.testCommand')
+                        : l10n.t('rules.enableRuleToTest'),
+                    onPressed: appState.isBusy || !rule.enabled
+                        ? null
+                        : () => appState.testRule(rule),
+                    icon: const Icon(Icons.play_arrow),
+                  ),
+                  IconButton(
+                    tooltip: l10n.t('rules.deleteRule'),
+                    onPressed: appState.isBusy
+                        ? null
+                        : () => appState.deleteRule(rule),
+                    icon: const Icon(Icons.delete_outline),
+                  ),
+                ],
               ),
             ],
           ),

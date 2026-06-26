@@ -75,6 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
+                          textInputAction: TextInputAction.next,
                           autofillHints: const [AutofillHints.email],
                           decoration: InputDecoration(
                             labelText: l10n.t('auth.email'),
@@ -86,6 +87,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         TextField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
+                          textInputAction: TextInputAction.done,
+                          onSubmitted: (_) {
+                            if (!appState.isBusy) {
+                              _submit();
+                            }
+                          },
                           autofillHints: const [AutofillHints.password],
                           decoration: InputDecoration(
                             labelText: l10n.t('auth.password'),
